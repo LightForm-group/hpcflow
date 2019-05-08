@@ -1,0 +1,5 @@
+profile: damask
+alternate_scratch: /mnt/iusers01/cr01/mbdxqap3/damask_sims
+command_groups:
+  - commands:
+    - DAMASK_spectral -g <<geom_fn>> -l <<load_fn>>

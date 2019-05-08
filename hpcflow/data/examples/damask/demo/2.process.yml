@@ -1,0 +1,29 @@
+profile: damask_process
+
+command_groups:
+  # group 1:
+  - commands:
+      - postResults --cr "f,p" --co "totalshear" --split --separation "x,y,z" <<spectral_fn>>
+  # group 2:
+  - commands:
+      - addCauchy <<table_inc_fn>> 
+      - addStrainTensors --logarithmic --left <<table_inc_fn>>
+      - addMises --stress "Cauchy" --strain "ln(V)" <<table_inc_fn>>
+    parallel:
+      variables: true
+
+variables:
+
+  # Method A:
+  table_inc_fn:
+    data: [20, 40, 60, 80]
+    value: 'postProc/<<spectral_base_fn>>_inc{:03d}.txt'
+    
+  # Method B:
+  # table_inc_fn:
+  #   file_regex:
+  #     pattern: 'postProc\/.+_inc([0-9]+).txt'
+  #     group: 0
+  #     type: int
+  #     subset: [20, 40, 60, 80]
+  #   value: 'postProc/<<spectral_base_fn>>_inc{:03d}.txt'

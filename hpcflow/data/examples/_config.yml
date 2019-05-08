@@ -1,0 +1,16 @@
+submission_filename_fmt: <<order>>.<<name>>.yml
+directory_list_filename_fmt: sim_list.txt
+confirm_before_submit: true
+profile_ext: '.yml'
+jobscript_ext: '.sh'
+variable_file_ext: '.txt'
+python_module_load: apps/anaconda3/5.2.0 # Perhaps not needed due to entrypoints?
+job_array: False            # Can be overridden at profile level
+job_array_variables: False  # Can be overridden at command group level
+hpcflow_directory: '.hpcflow'
+archive_locations:
+  dropbox:
+    path: a/b/c
+  rds:
+    path: /mnt/cr01-home01/mbdxqap3/test_hpcflow
+    exclude: ['.hpcflow']

@@ -1,0 +1,8 @@
+profile: damask
+
+alternate_scratch: /tmp/users/mbdxqap3
+options:
+  l: short
+archive:
+  name: rds
+  exclude: ['*.spectralOut']

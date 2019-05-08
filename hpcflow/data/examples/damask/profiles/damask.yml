@@ -1,0 +1,4 @@
+profile: default
+variable_scope: damask
+modules:
+  - apps/intel-17.0/damask/2.0.2

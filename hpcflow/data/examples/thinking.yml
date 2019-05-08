@@ -1,0 +1,177 @@
+profile: damask_process
+
+command_groups: # Each command groups corresponds to a jobscript, conditional on the previous?
+  # group 1:
+  - commands:
+      - postResults --cr "f,p" --co "totalshear" --split --separation "x,y,z" <<spectral_fn>>
+  # group 2:
+  - commands:
+      - addCauchy <<table_inc_fn>> 
+      - somethingFake <<spectral_fn>>
+      - addStrainTensors --logarithmic --left <<table_inc_fn>>
+      - addMises --stress "Cauchy" --strain "ln(V)" <<table_inc_fn>>
+    parallel: # parallel options can be specified at root level, or for each command group individually (will be resolved to be individual)
+      variables: true  # Split different variable values into separate (parallel) job array tasks? (must be independent)
+
+variables:
+
+  # Method A:
+  table_inc_fn:
+    data: [100, 80, 60, 40, 20]
+    value: 'postProc/<<spectral_base_fn>>_inc{:03d}.txt'
+
+
+"""
+
+------------
+
+# want to populate a dict of variable values.
+# only add a variable to the dict when all sub-variables are already in the dict.
+var_vals = {}
+
+# List all variables mentioned in the command group:
+vars = [table_inc_fn, spectral_fn]
+
+# For each variable, if it is a base variable, resolve and add to dict:
+var_vals = {
+  spectral_fn: ['geom_load.spectralOut'],   <--- NEW
+}
+
+# Remaining vars are compound:
+vars = [table_inc_fn]
+
+# For each compound var, list all dependent variables:
+sub_vars = [spectral_base_fn]
+
+# For each sub variable, it if is a base variable, resolve and add to dict:
+var_vals = {
+  spectral_fn: ['geom_load.spectralOut'],
+  spectral_base_fn: ['geom_load'],          <--- NEW
+}
+
+
+------------
+
+# want to populate a dict of variable values.
+# only add a variable to the dict when all sub-variables are already in the dict.
+var_vals = {}
+dep_map = {}
+
+# For each variables mentioned in the command group (table_inc_fn, spectral_fn):
+
+  # if it is a base variable, resolve and add to dict:
+  var_vals = {
+    'spectral_fn': ['geom_load.spectralOut'],   <--- NEW
+  }
+
+  # if it is a compound variable, add to the dependency map, along with the list
+  # of vars it depends on:
+  dep_map = {
+    'table_inc_fn': ['spectral_base_fn'],
+  }
+
+while (dep_map is not empty):
+
+  for each key in dep map:
+
+    for each val in list of var key depends on:
+
+      if it is a *resolved* var, add to var_vals and remove from dep map key list
+        if the key list is empty, remove key from dict, and add the key var to var vals
+      
+      if it is a compound var, add to dep map, along with list of vars it depends on
+
+
+
+# Dependency map:
+# { 'variable name': [list of 'parent' variables that are not yet resolved] }
+
+unresolved_dep_map = {
+  'spectral_base_fn': ['table_inc_fn', ],
+  'spectral_fn':      [],
+  'table_inc_fn':     [],
+}
+
+
+
+
+
+
+var_vals = {
+  spectral_base_fn: [],
+  table_inc_fn: [],
+  spectral_fn: [],
+}
+
+------------
+
+# Expand vars to include sub-variables that are included in any compound vars:
+vars = [table_inc_fn, spectral_fn, spectral_base_fn]
+
+var_dependencies = {
+  table_inc_fn: [spectral_base_fn,],
+  spectral_fn: [],
+}
+
+# Split into base variables and compound variables (which have other variables 
+# in their values). Include in the compouned vars a list of variables that are
+# included:
+base_vars = [spectral_fn]
+compound_vars = [(table_inc_fn, [spectral_base_fn])]
+
+comp_vars = {
+  spectral_base_fn: [table_inc_fn],
+}
+
+# Resolve all base_vars values and add to var_vals dict:
+
+var_vals = {
+  spectral_fn: ['geom_load.spectralOut'],
+}
+
+
+
+
+vals: [
+  ('geom_load', '100', 'geom_load.spectralOut'),
+  ('geom_load',  '80', 'geom_load.spectralOut'),
+  ('geom_load',  '60', 'geom_load.spectralOut'),
+  ('geom_load',  '40', 'geom_load.spectralOut'),
+  ('geom_load',  '20', 'geom_load.spectralOut'),
+]
+"""
+# ...which can then be formed into a bash loop in the js_cmd file, that accesses
+# a file for each variable:
+"""
+js1a_var1:
+---------
+geom_load
+geom_load...
+
+js1a_var2:
+---------
+100
+80...
+
+js1a_var3:
+---------
+geom_load.spectralOut
+geom_load.spectralOut...
+
+js1a_cmd:
+---------
+
+while true
+do
+    # Read command variables:
+    read -u3 table_inc_fn || break
+    read -u4 spectral_fn || break
+
+    # Execute the commands:
+    addCauchy ${table_inc_fn}
+    somethingFake ${spectral_fn}
+    addStrainTensors --logarithmic --left ${table_inc_fn}
+    addMises --stress Cauchy --strain ln(V) ${table_inc_fn}
+
+done <3 js1a_var1 <4 js1a_var2
+"""

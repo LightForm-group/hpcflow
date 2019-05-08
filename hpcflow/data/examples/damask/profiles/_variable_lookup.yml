@@ -1,0 +1,21 @@
+variable_templates:
+  file_name_full:
+    file_regex: '(.+\.<<arg>>)'
+    file_regex_group: 0
+    value_type: str
+    expected_multiplicity: 1
+  file_name_base:
+    file_regex: '(.+)\.<<arg>>'
+    file_regex_group: 0
+    value_type: str
+    expected_multiplicity: 1
+scopes:
+  damask:
+    variables_from_template:
+      geom_fn: [file_name_full, geom]
+      geom_base_fn: [file_name_base, geom]
+      load_fn: [file_name_full, load]
+      load_base_fn: [file_name_base, load]
+      spectral_fn: [file_name_full, spectralOut]
+      spectral_base_fn: [file_name_base, spectralOut]
+    variables: {}

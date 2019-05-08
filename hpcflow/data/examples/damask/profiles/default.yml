@@ -1,0 +1,6 @@
+pre_commands:
+  #- mkdir -p stdout
+
+options:
+  e: stdout/
+  o: stdout/
