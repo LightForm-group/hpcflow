@@ -14,8 +14,10 @@ date: April 2019
 
 ## Commands
 - `hpcflow --version`
+- `hpcflow make`
+  - Generate a Workflow.
 - `hpcflow submit` OR `submit`
-  - Submit all job specs in the current working directory
+  - Generate a Workflow if it doesn't exist and then submit (write jobscripts and execute) all job specs in the current working directory
 - `hpcflow submit <spec>` OR `submit <spec>`
   - Submit a named job spec
 - `hpcflow install-example <name>`
