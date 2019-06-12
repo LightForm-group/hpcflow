@@ -125,6 +125,8 @@ class Workflow(Base):
 
         self.validate()
 
+        self._execute_pre_commands()
+
     def get_variable_definition_by_name(self, variable_name):
         """Get the VarDefintion object using the variable name."""
 
@@ -480,6 +482,18 @@ class Workflow(Base):
             task_ranges_valid.append(task_range_i)
 
         return task_ranges_valid
+
+
+    def _execute_pre_commands(self):
+
+        for i in self.pre_commands:
+
+            proc = run(i, shell=True, stdout=PIPE, stderr=PIPE)
+            pre_cmd_out = proc.stdout.decode()
+            pre_cmd_err = proc.stderr.decode()
+
+            print('pre_cmd_out: {}'.format(pre_cmd_out))
+            print('pre_cmd_err: {}'.format(pre_cmd_err))
 
 
 class CommandGroup(Base):

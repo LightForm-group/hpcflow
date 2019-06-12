@@ -60,7 +60,10 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     # precedence. Also extract out variable definitions.
     var_definitions = {}
     command_groups = []
+    pre_commands = []
     for i in all_profiles:
+
+        pre_commands.extend(i.get('pre_commands') or [])
 
         profile_cmd_groups = []
         # Form command group list:
@@ -106,6 +109,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     workflow = {
         'command_groups': command_groups,
         'var_definitions': var_definitions,
+        'pre_commands': pre_commands,
     }
 
     return workflow
