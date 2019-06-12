@@ -355,10 +355,12 @@ class Workflow(Base):
 
         last_submit_id = None
 
+        sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
+
         assert len(js_paths) == len(cmd_group_subs)
         for idx, (js_path, cg_sub) in enumerate(zip(js_paths, cmd_group_subs)):
 
-            qsub_cmd = ['qsub']
+            qsub_cmd = [sumbit_cmd]
 
             if idx > 0:
                 
