@@ -5,8 +5,6 @@ profile_ext: '.yml'
 jobscript_ext: '.sh'
 variable_file_ext: '.txt'
 python_module_load: apps/anaconda3/5.2.0 # Perhaps not needed due to entrypoints?
-job_array: False            # Can be overridden at profile level
-job_array_variables: False  # Can be overridden at command group level
 hpcflow_directory: '.hpcflow'
 archive_locations:
   dropbox:

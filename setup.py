@@ -52,5 +52,8 @@ setup(
     entry_points="""
         [console_scripts]
         {0}={0}.cli:cli
+        hfsub={0}.cli:submit
+        hfmake={0}.cli:make
+        hfstat={0}.cli:stat
     """.format(package_name)
 )

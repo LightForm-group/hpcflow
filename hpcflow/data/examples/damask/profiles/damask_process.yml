@@ -1,7 +1,7 @@
 profile: damask
 
 alternate_scratch: /tmp/users/mbdxqap3
-options:
+scheduler_options:
   l: short
 archive:
   name: rds
