@@ -223,8 +223,15 @@ def archive(cmd_group_sub_id, task, dir_path=None):
     Session = init_db(project.db_uri, check_exists=True)
     session = Session()
 
+    print('cmd_group_sub_id: {}'.format(cmd_group_sub_id))
+    print('task: {}'.format(task))
+    print('dir_path: {}'.format(dir_path))
+
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.archive(task)
+
+    print('cg_sub: {}'.format(cg_sub))
+
+    cg_sub.archive(task, session)
 
     session.commit()
     session.close()
