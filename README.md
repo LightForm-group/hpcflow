@@ -101,14 +101,16 @@ Here is a list of `hpcflow` (sub-)commands. Type `<command> --help` to show the 
 | `hpcflow --version` | -     | ️️️️️️✅    | Show the version of `hpcflow`.                                                                           |
 | `hpcflow --info`    | -     | ❌           | Show information about the current `hpcflow` installation, including where the data directory is located. |
 | `hpcflow --config`  | -     | ❌           | Show the contents and location of the `hpcflow` global configuration file.                               |
-| `hpcflow make`      |`hfmake`| ❌           | Generate a Workflow. | 
-| `hpcflow submit`    |`hfsub` | ❌           | Generate a Workflow if it doesn't exist and then submit (write jobscripts and execute) all command groups in the current working directory. | 
+| `hpcflow make`      |`hfmake`| ✅           | Generate a Workflow. | 
+| `hpcflow submit`    |`hfsub` | ✅           | Generate a Workflow if it doesn't exist and then submit (write jobscripts and execute) all command groups in the current working directory. | 
 |`hpcflow install-example` | - | ❌           | Install an example set of profiles from the `examples` directory (files with the same name will be overwritten). |
 | `hpcflow add-inputs` | - | ❌           | Add an example set of input files to be used with the example profile the `examples` directory. This involves merging `_variable_lookup.yml` and `_archive_locations.yml` from the example into the user's profile directory. | 
-| `hpcflow write-cmd` | - | ❌           | Write the command file for a given jobscript. This script is invoked within jobscripts at execution-time and is not expected to be invoked by the user. The `write-cmd` process involves opening the JSON representation of the profile set and resolving variables for the set of commands within a given command group. |
+| `hpcflow write-cmd` | - | ✅           | Write the command file for a given jobscript. This script is invoked within jobscripts at execution-time and is not expected to be invoked by the user. The `write-cmd` process involves opening the JSON representation of the profile set and resolving variables for the set of commands within a given command group. |
 | `hpcflow show-stats` | - | ❌           | Show statistics like CPU walltime for the profile set in the current directory. |
-| `hpcflow clean` | - | ❌           | Remove all `hpcflow`-generated files from the current directory (use confirmation?). |
+| `hpcflow clean` | - | ✅           | Remove all `hpcflow`-generated files from the current directory (use confirmation?). |
 | `hpcflow stat` | `hfstat` | ❌           | Show status of running tasks and how many completed tasks within this directory. |
+| `hpcflow delete` | `hfdel` | ❌           | Delete one or more jobscripts associated with a workflow. |
+| `hpcflow archive` | - | ✅           | Archive the working directory of a given command group. |
 
 ### Commands that interact with the local database
 
