@@ -11,7 +11,7 @@ from subprocess import run, PIPE
 
 from sqlalchemy import (
     Table, Column, Integer, DateTime, JSON, ForeignKey, Boolean, Enum, String,
-    select
+    select, UniqueConstraint
 )
 from sqlalchemy.orm import relationship, deferred
 
@@ -46,7 +46,7 @@ class Workflow(Base):
                                         back_populates='workflow')
 
     def __init__(self, directory, command_groups, var_definitions=None,
-                 pre_commands=None):
+                 pre_commands=None, archives=None):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -62,7 +62,11 @@ class Workflow(Base):
             references in any of the command groups.
         pre_commands : list of str
             List of commands to execute on creation of the Workflow.
-
+        archives : list of dict
+            List of dicts representing archive locations. Each dict in
+            `command_groups` may contain keys `archive_idx` (which is an
+            index into `archives`) and `archive_excludes` (which is a list
+            of glob patterns to ignore when archiving).
         """
 
         # Command group directories must always be variables:
@@ -102,6 +106,10 @@ class Workflow(Base):
             VarDefinition(name=k, **v) for k, v in var_definitions.items()
         ]
 
+        # Generate Archive objects:
+        if archives:
+            archive_objs = [Archive(**kwargs) for kwargs in archives]
+
         cmd_groups = []
         for i in command_groups:
 
@@ -115,7 +123,11 @@ class Workflow(Base):
             i.update({
                 'directory_var': dir_var_defn,
             })
-
+            arch_idx = i.pop('archive_idx', None)
+            if arch_idx is not None:
+                i.update({
+                    'archive': archive_objs[arch_idx]
+                })
             cmd_groups.append(CommandGroup(**i))
 
         self.command_groups = cmd_groups
@@ -483,7 +495,6 @@ class Workflow(Base):
 
         return task_ranges_valid
 
-
     def _execute_pre_commands(self):
 
         for i in self.pre_commands:
@@ -505,6 +516,7 @@ class CommandGroup(Base):
     id_ = Column('id', Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey('workflow.id'))
     directory_variable_id = Column(Integer, ForeignKey('var_definition.id'))
+    archive_id = Column(Integer, ForeignKey('archive.id'), nullable=True)
 
     commands = Column(JSON)
     is_job_array = Column(Boolean)
@@ -514,7 +526,9 @@ class CommandGroup(Base):
     scheduler_options = Column(JSON, nullable=True)
     profile_name = Column(String(255), nullable=True)
     profile_order = Column(Integer, nullable=True)
+    archive_excludes = Column(JSON, nullable=True)
 
+    archive = relationship('Archive', back_populates='command_groups')
     workflow = relationship('Workflow', back_populates='command_groups')
     command_group_submissions = relationship('CommandGroupSubmission',
                                              back_populates='command_group')
@@ -524,7 +538,7 @@ class CommandGroup(Base):
     def __init__(self, commands, directory_var, is_job_array=True,
                  exec_order=None, nesting=None, modules=None,
                  scheduler_options=None, profile_name=None,
-                 profile_order=None):
+                 profile_order=None, archive=None, archive_excludes=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -565,6 +579,11 @@ class CommandGroup(Base):
         profile_order : int, optional
             If the command group was generated as part of a job profile file,
             the profile order should be passed here.
+        archive : Archive, optional
+            The Archive object associated with this command group.
+        archive_excludes : list of str
+            List of glob patterns representing files that should be excluding
+            when archiving this command group.
 
         TODO: document how `nesting` interacts with `is_job_array`.
 
@@ -581,6 +600,9 @@ class CommandGroup(Base):
         self.directory_variable = directory_var
         self.profile_name = profile_name
         self.profile_order = profile_order
+
+        self.archive = archive
+        self.archive_excludes = archive_excludes
 
         self.validate()
 
@@ -1493,6 +1515,27 @@ class VarValue(Base):
         self.directory_value = directory_value
 
 
+class Archive(Base):
+    """Class to represent an archive location."""
+
+    __tablename__ = 'archive'
+    __table_args__ = (
+        UniqueConstraint('path', 'host', name='archive_location'),
+    )
+
+    id_ = Column('id', Integer, primary_key=True)
+    name = Column(String(255))
+    path = Column(String(255))
+    host = Column(String(255), nullable=True)
+
+    command_groups = relationship('CommandGroup', back_populates='archive')
+
+    def __init__(self, name, path, host=''):
+
+        self.name = name
+        self.path = path
+        self.host = host
+
 class Project(object):
 
     DB_URI = 'sqlite:///{}/workflows.db'
@@ -1512,3 +1555,6 @@ class Project(object):
     def clean(self):
         if self.hf_dir.exists():
             shutil.rmtree(str(self.hf_dir))
+
+
+

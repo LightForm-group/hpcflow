@@ -61,6 +61,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     var_definitions = {}
     command_groups = []
     pre_commands = []
+    archives = []
     for i in all_profiles:
 
         pre_commands.extend(i.get('pre_commands') or [])
@@ -69,6 +70,32 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         # Form command group list:
         exec_order_add = len(command_groups)
         for j in i['command_groups']:
+
+            # Resolve archive locations from CONFIG file
+            # Add archive_idx and archive_exclude; remove archive
+            arch = j.pop('archive', None)
+            if arch:
+                arch_name = arch['name']
+                arch_exc = arch.get('exclude')
+                arch_loc = CONFIG['archive_locations'][arch_name]
+
+                existing_idx = None
+                for k_idx, k in enumerate(archives):
+                    if k['name'] == arch_name:
+                        existing_idx = k_idx
+                        break
+
+                if existing_idx is not None:
+                    j['archive_idx'] = existing_idx
+                else:
+                    archives.append({
+                        'name': arch_name,
+                        **arch_loc,
+                    })
+                    j['archive_idx'] = len(archives) - 1
+
+                if arch_exc:
+                    j['archive_excludes'] = arch_exc
 
             # Populate with defaults first:
             cmd_group = {
@@ -110,6 +137,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         'command_groups': command_groups,
         'var_definitions': var_definitions,
         'pre_commands': pre_commands,
+        'archives': archives,
     }
 
     return workflow
