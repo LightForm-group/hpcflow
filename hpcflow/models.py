@@ -1532,13 +1532,33 @@ class CommandGroupSubmission(Base):
 
         print('..::CGS.archive()::...')
 
+        print('task_idx: {}'.format(task_idx))
+
         sub = self.submission
         scheduler_groups = sub.workflow.get_scheduler_groups(sub)
+        print('scheduler groups')
+        pprint(scheduler_groups)
+        
         sch_group = scheduler_groups['command_groups'][
             self.command_group_exec_order]
 
+        print('sch_group: {}'.format(sch_group))
+
         task_step_size = sch_group['task_step_size']
-        dir_idx = int((task_idx - 1) / task_step_size)
+        print('task_step_size: {}'.format(task_step_size))
+
+        max_num_tasks = scheduler_groups['max_num_tasks'][
+            sch_group['scheduler_group_idx']]
+
+        dir_idx = floor(
+            ((task_idx - 1) / max_num_tasks) * len(self.directories))
+
+        print('dirs:')
+        pprint(self.directories)
+
+        print('dir values:')
+        pprint(self.directory_values)
+
         dir_val = self.directories[dir_idx]
 
         exclude = self.command_group.archive_excludes
@@ -1605,6 +1625,7 @@ class Archive(Base):
         Parameters
         ----------
         directory_value : VarValue
+        exclude : list of str
 
         """
         root_dir = self.command_groups[0].workflow.directory
