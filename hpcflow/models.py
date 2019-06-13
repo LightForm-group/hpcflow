@@ -1365,7 +1365,8 @@ class CommandGroupSubmission(Base):
                  for i in sorted(cmd_group.modules)]
 
         cmd_exec = [
-            'SUBMIT_DIR=`pwd`/{}'.format(submit_dir_relative),
+            'ROOT_DIR=`pwd`'
+            'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
             'INPUTS_DIR=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
             'cd $INPUTS_DIR',
             '',
@@ -1375,7 +1376,7 @@ class CommandGroupSubmission(Base):
         arch_lns = []
         if self.command_group.archive:
             arch_lns = [
-                'hpcflow archive -d `pwd` -t $SGE_TASK_ID {}'.format(self.id_),
+                'hpcflow archive -d $ROOT_DIR -t $SGE_TASK_ID {}'.format(self.id_),
                 ''
             ]
 
