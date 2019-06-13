@@ -1288,7 +1288,7 @@ class CommandGroupSubmission(Base):
         ]
 
         write_cmd_exec = [
-            'hpcflow write-cmd -d `pwd` {0:} > $LOG_PATH'.format(self.id_),
+            'hpcflow write-cmd -d `pwd` {0:} > $LOG_PATH 2>&1'.format(self.id_),
         ]
 
         loads = ['module load {}'.format(i)
@@ -1303,7 +1303,7 @@ class CommandGroupSubmission(Base):
         if self.command_group.archive:
             arch_lns = [
                 ('hpcflow archive -d $ROOT_DIR -t $SGE_TASK_ID {0:} >> '
-                 '$LOG_PATH'.format(self.id_)),
+                 '$LOG_PATH 2>&1'.format(self.id_)),
                 ''
             ]
 
