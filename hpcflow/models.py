@@ -1365,7 +1365,7 @@ class CommandGroupSubmission(Base):
                  for i in sorted(cmd_group.modules)]
 
         cmd_exec = [
-            'ROOT_DIR=`pwd`'
+            'ROOT_DIR=`pwd`',
             'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
             'INPUTS_DIR=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
             'cd $INPUTS_DIR',
