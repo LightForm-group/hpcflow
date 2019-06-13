@@ -9,6 +9,7 @@ from math import ceil, floor
 from pprint import pprint
 from subprocess import run, PIPE
 from time import sleep
+from datetime import datetime
 from shutil import ignore_patterns
 
 from sqlalchemy import (
@@ -1670,7 +1671,9 @@ class Archive(Base):
         else:
             ignore_func = None
 
+        print('{}: copy start'.format(datetime.now()))
         copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
+        print('{}: copy end'.format(datetime.now()))
 
 
 class Project(object):
