@@ -1527,7 +1527,7 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
-    def archive(self, task_idx):
+    def archive(self, task_idx, session):
         """Archive the working directory associated with a given task in this
         command group submission."""
 
@@ -1563,7 +1563,7 @@ class CommandGroupSubmission(Base):
         dir_val = self.directories[dir_idx]
 
         exclude = self.command_group.archive_excludes
-        self.command_group.archive.execute(dir_val, exclude)
+        self.command_group.archive.execute(dir_val, exclude, session)
 
 
 class VarValue(Base):
@@ -1620,7 +1620,7 @@ class Archive(Base):
         self.path = path
         self.host = host
 
-    def execute(self, directory_value, exclude):
+    def execute(self, directory_value, exclude, session):
         """Execute the archive process of a given working directory.
 
         Parameters
@@ -1645,6 +1645,7 @@ class Archive(Base):
                 try:
                     print('add directory value to is_archiving')
                     self.directories_archiving.append(directory_value)
+                    session.commit()
                     blocked = False
                 except IntegrityError:
                     print('could not add, already exists...wait...')
@@ -1652,12 +1653,18 @@ class Archive(Base):
                 if not blocked:
                     print('No block...START archive for {}'.format(
                         directory_value.value))
-                    self.directories_archiving.remove(directory_value)
                     self._copy(src_dir, dst_dir, exclude)
+                    self.directories_archiving.remove(directory_value)
+                    session.commit()
                     
 
     def _copy(self, src_dir, dst_dir, exclude):
-        """Do the actual copying."""
+        """Do the actual copying.
+        
+        TODO: does copytree overwrite all files or just copy
+        non-existing files?
+
+        """
         
         print(':_copy:')
         print('src_dir: {}'.format(src_dir))
@@ -1670,10 +1677,14 @@ class Archive(Base):
             ignore_func = ignore_patterns(*ignore)
         else:
             ignore_func = None
-
-        print('{}: copy start'.format(datetime.now()))
+                        
+        start = datetime.now()
+        print('{}: copy start'.format(start))
         copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
-        print('{}: copy end'.format(datetime.now()))
+        end = datetime.now()
+        print('{}: copy end'.format(end))
+        copy_seconds = (end - start).total_seconds()
+        print('copy seconds: {}'.format(copy_seconds))
 
 
 class Project(object):
