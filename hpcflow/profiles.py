@@ -112,9 +112,6 @@ def parse_job_profiles(dir_path=None, profile_list=None):
 
         command_groups.extend(profile_cmd_groups)
 
-        # print('profile_cmd_groups')
-        # pprint(profile_cmd_groups)
-
         # Extract var_defs from profile and from var lookup given var scope:
         var_scope = i.get('variable_scope')
         var_defns_all = i.get('variables', {})
@@ -129,9 +126,6 @@ def parse_job_profiles(dir_path=None, profile_list=None):
             )
 
             var_definitions.update(cmd_group_var_defns)
-
-    # print('var_definitions')
-    # pprint(var_definitions)
 
     workflow = {
         'command_groups': command_groups,
@@ -283,9 +277,6 @@ def resolve_job_profile(job_profile_path, filename_var_values,
                 raise ValueError(msg.format(i, job_profile_path.name))
             else:
                 merged_profile.update({i: filename_var_values[i]})
-
-    # print('merged_profile')
-    # pprint(merged_profile)
 
     merged_profile = validate_job_profile(merged_profile)
 

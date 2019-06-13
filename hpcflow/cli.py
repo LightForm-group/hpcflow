@@ -189,8 +189,6 @@ def submit(directory=None, workflow_id=None, task_ranges=None, profiles=None,
     """Submit(and optionally generate) a Workflow."""
 
     print('hpcflow.cli.submit', flush=True)
-    # print('task_ranges')
-    # pprint(task_ranges)
 
     existing_ids = api.get_workflow_ids(directory)
     submit_args = {

@@ -146,15 +146,10 @@ def resolve_sub_vars(var_defns, all_var_defns):
 
     """
 
-    # print(':resolve_sub_vars:')
-
     new_var_defns = {}
     var_delims = CONFIG['variable_delimiters']
 
     for _, var_defn_i in var_defns.items():
-
-        # print('\nvar_defn_i: ')
-        # pprint(var_defn_i)
 
         val_i = var_defn_i.get('value', '{}')
         sub_var_names = extract_variable_names(val_i, var_delims)
@@ -208,9 +203,6 @@ def select_cmd_group_var_definitions(var_defns_all, commands, directory):
         the commands and directory associated with this command group.
 
     """
-
-    # print('var_defns_all')
-    # pprint(var_defns_all)
 
     var_defns = {}
     var_names = select_cmd_group_var_names(commands, directory)
@@ -480,23 +472,14 @@ def resolve_variable_values(var_defns, directory):
 
     """
 
-    # print('\n::resolve_variable_values::')
-    # print('var_defns')
-    # pprint(var_defns)
-
     unresolvable_var_names = []
     var_vals = {}
     dep_map = {}
 
     for i in var_defns:
 
-        # print('i.name: {}'.format(i.name))
-        # print('i.value: {}'.format(i.value))
-        # print('i.data: {}'.format(i.data))
-        # print('i.file_regex: {}'.format(i.file_regex))
-
         if i.is_base_variable():
-            # print('base_variable')
+
             try:
                 vals = i.get_values(directory)
             except UnresolvedVariableError:
@@ -511,14 +494,9 @@ def resolve_variable_values(var_defns, directory):
             })
 
         else:
-            # print('NOT base_variable')
             dep_map.update({
                 i.name: i.get_dependent_variable_names(),
             })
-
-    # print('unresolvable_var_names: {}'.format(unresolvable_var_names))
-    # print('var_vals: {}'.format(var_vals))
-    # print('dep_map: {}'.format(dep_map))
 
     # Remove all vars from dep_map that depend on unresolvable vars:
     dep_map_new = {}
@@ -538,8 +516,6 @@ def resolve_variable_values(var_defns, directory):
     count = 0
     while dep_map:
 
-        # print('while count: {}'.format(count))
-
         if count > 5:
             msg = 'Could not resolve variables in 10 iterations.'
             raise ValueError(msg)
@@ -554,28 +530,18 @@ def resolve_variable_values(var_defns, directory):
 
             for i in v:
 
-                # print('has {} been previously resolved?'.format(i))
-
                 if i in var_vals:
                     sub_var_vals.update({i: var_vals[i]['vals']})
-                    # print('...yes')
 
                 else:
-                    # print('...no')
                     dep_resolved = False
                     break
-
-            # if i in unresolvable_var_names:
-            #     continue
 
             if dep_resolved:
 
                 var_defn_i = [i for i in var_defns if i.name == k][0]
                 values = var_defn_i.get_values(directory)
                 err_msg = 'Variable multiplicity mismatch!'
-
-                # print('values: {}'.format(values))
-                # print('sub_var_vals: {}'.format(sub_var_vals))
 
                 sub_var_vals_keys = list(sub_var_vals.keys())
                 sub_var_vals_vals = list(sub_var_vals.values())

@@ -72,19 +72,10 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         # Get workflow from YAML profiles:
         workflow_dict = parse_job_profiles(project.dir_path, profile_list)
 
-    # print('workflow_dict')
-    # pprint(workflow_dict)
-
     Session = init_db(project.db_uri, check_exists=False)
     session = Session()
 
     workflow = Workflow(directory=project.dir_path, **workflow_dict)
-
-    # print('session.dirty')
-    # pprint(session.dirty)
-
-    # print('session.new')
-    # pprint(session.new)
 
     session.add(workflow)
     session.commit()
@@ -120,19 +111,9 @@ def submit_workflow(workflow_id, dir_path=None, task_ranges=None):
     workflow = session.query(Workflow).get(workflow_id)
     submission = workflow.add_submission(project, task_ranges)
 
-    # print('workflow.subs: ')
-    # pprint(workflow.submissions)
-
-    # print('session.new: {}'.format(session.new))
-    # print('session.dirty: {}'.format(session.dirty))
-
     session.commit()
 
     submission_id = submission.id_
-    # submission.write_jobscripts()
-    # submission.execute()
-
-    # session.commit()
     session.close()
 
     return submission_id
@@ -187,19 +168,12 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
         is the working (i.e. invoking) directory.
 
     """
-    print('..::api.write_cmd::..', flush=True)
-
     project = Project(dir_path)
     Session = init_db(project.db_uri, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-
-    print('cg_sub: {}'.format(cg_sub), flush=True)
-
     cg_sub.write_cmd(project)
-
-    print('finished writing commands, committing and closing session.', flush=True)
 
     session.commit()
     session.close()
@@ -226,14 +200,7 @@ def archive(cmd_group_sub_id, task, dir_path=None):
     Session = init_db(project.db_uri, check_exists=True)
     session = Session()
 
-    print('cmd_group_sub_id: {}'.format(cmd_group_sub_id))
-    print('task: {}'.format(task))
-    print('dir_path: {}'.format(dir_path))
-
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-
-    print('cg_sub: {}'.format(cg_sub))
-
     cg_sub.archive(task)
 
     session.commit()

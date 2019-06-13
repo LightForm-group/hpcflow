@@ -217,8 +217,6 @@ class Workflow(Base):
 
         """
 
-        print('..::W.get_scheduler_groups::..')
-
         # First group command groups into scheduler groups:
         scheduler_groups = {
             'command_groups': [],
@@ -239,12 +237,6 @@ class Workflow(Base):
                 sch_group_cmd_groups[sch_group_idx].append(i_idx)
             else:
                 sch_group_cmd_groups.append([i_idx])
-
-        # print('scheduler_groups:')
-        # pprint(scheduler_groups)
-
-        # print('sch_group_cmd_groups:')
-        # pprint(sch_group_cmd_groups)
 
         # Now resolve the required task range for each command group:
         for sch_group_idx, cmd_groups in enumerate(sch_group_cmd_groups):
@@ -270,9 +262,6 @@ class Workflow(Base):
                 scheduler_groups['command_groups'][cg_idx].update({
                     'task_step_size': int(max_num_out / num_outs),
                 })
-
-        # print('scheduler_groups:')
-        # pprint(scheduler_groups)
 
         return scheduler_groups
 
@@ -348,10 +337,6 @@ class Workflow(Base):
 
         """
 
-        # TEMP: submit all for now.
-        # _ = self._validate_task_ranges(task_ranges)
-        # print('task_ranges: {}'.format(task_ranges))
-
         sub = Submission()
 
         # Add the new submission to this Workflow:
@@ -368,13 +353,8 @@ class Workflow(Base):
 
         sch_groups = self.get_scheduler_groups(sub)
 
-        # print('sch_groups')
-        # pprint(sch_groups)
-
         submit_dir = sub.write_submit_dirs(
             self.id_, project.hf_dir, sch_groups)
-
-        # print('submit_dir: {}'.format(submit_dir))
 
         # Write a jobscript for each command group submission:
         js_paths = []
@@ -387,9 +367,6 @@ class Workflow(Base):
             js_paths.append(
                 i.write_jobscript(**js_kwargs, dir_path=submit_dir)
             )
-
-        print('js_paths')
-        pprint(js_paths)
 
         last_submit_id = None
 
@@ -411,15 +388,11 @@ class Workflow(Base):
                 qsub_cmd += [hold_arg, last_submit_id]
 
             qsub_cmd.append(str(js_path))
-
-            print('qsub_cmd: {}'.format(qsub_cmd))
-
             proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
             qsub_out = proc.stdout.decode()
             qsub_err = proc.stderr.decode()
 
             print('qsub_out: {}'.format(qsub_out))
-            print('qsub_err: {}'.format(qsub_err))
 
             # Extract newly submitted job ID:
             pat = r'[0-9]+'
@@ -434,7 +407,6 @@ class Workflow(Base):
                 raise ValueError(msg.format(js_path))
 
             last_submit_id = job_id_str
-            print('last_submit_id: {}'.format(last_submit_id))
 
         return sub
 
@@ -526,9 +498,6 @@ class Workflow(Base):
             proc = run(i, shell=True, stdout=PIPE, stderr=PIPE)
             pre_cmd_out = proc.stdout.decode()
             pre_cmd_err = proc.stderr.decode()
-
-            print('pre_cmd_out: {}'.format(pre_cmd_out))
-            print('pre_cmd_err: {}'.format(pre_cmd_err))
 
 
 class CommandGroup(Base):
@@ -686,9 +655,6 @@ class CommandGroup(Base):
             self.directory_variable.value,
         )
 
-        # print('cmd_group_var_defns')
-        # pprint(cmd_group_var_defns)
-
         var_defns = [
             i for i in self.workflow.variable_definitions
             if i.name in cmd_group_var_defns
@@ -764,9 +730,6 @@ class VarDefinition(Base):
 
         """
 
-        # print('..::VD.get_multiplicitiy::..')
-        # print('var name: {}'.format(self.name))
-
         var_length = None
 
         if self.data:
@@ -804,9 +767,6 @@ class VarDefinition(Base):
             If the variable...
 
         """
-        # print('\n:VD.get_values: getting var value '
-        #       'for VD: {}'.format(self.name))
-        # pprint(self.__dict__)
 
         vals = []
 
@@ -816,7 +776,6 @@ class VarDefinition(Base):
 
                 for root, _, _ in os.walk(directory):
                     root_rel = Path(root).relative_to(directory).as_posix()
-                    # print('root_rel: {}'.format(root_rel))
 
                     match = re.search(self.file_regex['pattern'], root_rel)
                     if match:
@@ -825,7 +784,6 @@ class VarDefinition(Base):
                             match = match_groups[self.file_regex['group']]
                             val_fmt = self.value.format(match)
                             vals.append(val_fmt)
-                    # print('match: {}'.format(match))
 
             else:
                 # Search files in the given directory
@@ -837,7 +795,6 @@ class VarDefinition(Base):
                             match = match_groups[self.file_regex['group']]
                             val_fmt = self.value.format(match)
                             vals.append(val_fmt)
-                            # print('val_fmt: {}'.format(val_fmt))
 
         elif self.data:
             for i in self.data:
@@ -849,9 +806,6 @@ class VarDefinition(Base):
         if not vals:
             msg = ('Cannot resolve variable value with name: {}')
             raise UnresolvedVariableError(msg.format(self.name))
-
-        # print('vals are')
-        # pprint(vals)
 
         return vals
 
@@ -936,8 +890,6 @@ class Submission(Base):
         # Loop through CommandGroupSubmissions in order:
         for i in self.command_group_submissions:
 
-            # print('on CGS {}'.format(i))
-
             # VarValues representing the command group directories:
             cg_dirs_var_vals = []
 
@@ -963,13 +915,8 @@ class Submission(Base):
 
             for j in cg_dirs_var_vals:
 
-                # print('Resolving vars in dir: {}'.format(j.value))
-
                 var_vals_dat = resolve_variable_values(
                     var_defns_rec, Path(j.value))
-
-                # print('var_vals_dat')
-                # pprint(var_vals_dat)
 
                 for k, v in var_vals_dat.items():
 
@@ -980,21 +927,10 @@ class Submission(Base):
                         for val_idx, val in enumerate(vals_dat):
                             VarValue(val, val_idx, var_defn,
                                      self, directory_value=j)
-                            # print('committing new VarValue')
-                            # print('session.new:')
-                            # pprint(session.new)
-                            # print('session.dirty')
-                            # pprint(session.dirty)
                             session.commit()
 
     def write_submit_dirs(self, workflow_id, hf_dir, scheduler_groups):
         """Write the directory structure necessary for this submission."""
-
-        # print('\n:S.write_submit_dirs:')
-        # print('self.id_: {}'.format(self.id_))
-        # print('hf_dir: {}'.format(hf_dir))
-        # print('scheduler_groups')
-        # pprint(scheduler_groups)
 
         wf_path = hf_dir.joinpath('workflow_{}'.format(workflow_id))
         if not wf_path.exists():
@@ -1094,7 +1030,6 @@ class CommandGroupSubmission(Base):
         var_vals_dat_ii = {}
         for i in self.command_group.variable_definitions:
 
-            # print('var name: {}'.format(i.name))
             var_vals_i = self.submission.get_variable_values(i)
 
             cg_dirs = self.command_group.directory_variable.variable_values
@@ -1129,12 +1064,7 @@ class CommandGroupSubmission(Base):
                 only_vals.append(v)
                 only_names.append(k)
 
-            # print('only_names:')
-            # pprint(only_names)
-
             only_vals_uniform = coerce_same_length(only_vals)
-            # print('only_vals_uniform:')
-            # pprint(only_vals_uniform)
 
             for i in list(map(list, zip(*only_vals_uniform))):
 
@@ -1143,17 +1073,10 @@ class CommandGroupSubmission(Base):
                     'vals': {}
                 }
 
-                # print('i: {}'.format(i))
-
                 for j, k in zip(only_names, i):
-
-                    # print('j: {}, k: {}'.format(j, k))
                     var_vals_normed['vals'].update({j: k})
 
                 var_vals_normed_all.append(var_vals_normed)
-
-        # print('var_vals_normed_all')
-        # pprint(var_vals_normed_all)
 
         return var_vals_normed_all
 
@@ -1214,8 +1137,7 @@ class CommandGroupSubmission(Base):
 
     def get_var_definition_by_name(self, var_name):
         """"""
-        # print('get_var_definition_by_name')
-        # print(self.command_group.var_definitions)
+
         for i in self.command_group.var_definitions:
             if i.name == var_name:
                 return i
@@ -1273,11 +1195,8 @@ class CommandGroupSubmission(Base):
         TODO: logical refactoring.
 
         """
-        print('\n:CGS:get_num_outputs: num_inputs: {}'.format(num_inputs))
 
         if self.all_variables_resolved:
-
-            print('\tall_variables_resolved')
 
             if self.command_group.is_job_array:
                 var_vals = self.get_variable_values_normed()
@@ -1297,10 +1216,8 @@ class CommandGroupSubmission(Base):
 
         else:
 
-            print('\tNOT all_variables_resolved')
-
             if self.command_group.nesting is None:
-                print('\t\tnesting is None')
+
                 if num_inputs:
                     num_outputs = num_inputs
                     return num_outputs
@@ -1308,7 +1225,6 @@ class CommandGroupSubmission(Base):
             if self.command_group.is_job_array == False:
                 # Not job array:
 
-                print('\t\tjob_array is False')
                 if self.command_group.nesting == NestingType('nest'):
                     num_outputs = num_inputs
                 elif self.command_group.nesting == NestingType('hold'):
@@ -1318,10 +1234,8 @@ class CommandGroupSubmission(Base):
 
             else:
 
-                print('\t\tjob_array is True')
                 # Job array; need to find task multiplicity:
                 task_multi = self.get_task_multiplicity()
-                print('\t\ttask_multi: {}'.format(task_multi))
 
                 if self.command_group.nesting == NestingType('nest'):
                     num_outputs = num_inputs * task_multi
@@ -1329,21 +1243,12 @@ class CommandGroupSubmission(Base):
                     num_outputs = task_multi
                 elif self.command_group.nesting is None:
                     num_outputs = task_multi
-                    print('\t\t\tnum_outputs: {}'.format(num_outputs))
-
-        print('num_outputs: {}'.format(num_outputs))
 
         return num_outputs
 
     def write_jobscript(self, task_step_size, max_num_tasks,
                         scheduler_group_idx, dir_path):
         """Write the jobscript."""
-
-        # print('\n:CGS.write_jobscript:')
-        # print('task_step_size: {}'.format(task_step_size))
-        # print('max_num_tasks: {}'.format(max_num_tasks))
-        # print('scheduler_group_idx: {}'.format(scheduler_group_idx))
-        # print('dir_path: {}'.format(dir_path))
 
         js_ext = CONFIG.get('jobscript_ext', '')
         js_name = 'js_{}'.format(self.command_group_exec_order)
@@ -1421,73 +1326,42 @@ class CommandGroupSubmission(Base):
         """Write all files necessary to execute the commands of this command
         group."""
 
-        print('..::CGS.write_cmd::.. at {}'.format(datetime.now()), flush=True)
-
         session = Session.object_session(self)
 
         if not self.commands_written:
-
-            print('{} commands are not written'.format(datetime.now()), flush=True)
 
             sleep_time = 5
             blocked = True
             while blocked:
 
-                print('{} refreshing CGS'.format(datetime.now()), flush=True)
                 session.refresh(self)
 
-                print('{} in while blocked'.format(datetime.now()), flush=True)
-
-                print('self.is_command_writing: {}'.format(
-                    self.is_command_writing), flush=True)
-
                 if self.is_command_writing:
-                    print('{} commands are writing...wait'.format(datetime.now()), flush=True)
                     sleep(sleep_time)
 
                 else:
-                    print('{} commands are not writing'.format(datetime.now()), flush=True)
                     try:
-                        print('{} trying to set commands writing'.format(
-                            datetime.now()), flush=True)
                         self.is_command_writing = IsCommandWriting()
-                        print('{} committing.'.format(datetime.now()))
                         session.commit()
                         blocked = False
 
                     except IntegrityError:
-                        print('{} commands were already writing. rollback.'.format(
-                            datetime.now()), flush=True)
                         session.rollback()
                         sleep(sleep_time)
 
                     if not blocked:
-                        print('{} not blocked.'.format(datetime.now()), flush=True)
-                        
+
                         if not self.commands_written:
-                        
-                            print('{} commands not written... writing...'.format(
-                                datetime.now()), flush=True)
-                        
+
                             self._write_cmd(project)
                             self.commands_written = True
-                        
-                        print('{} removing is_command_writing'.format(
-                            datetime.now()), flush=True)
-                        
-                        self.is_command_writing = None
-                        print('{} committing'.format(datetime.now()), flush=True)
-                        session.commit()
 
-        else:
-            run('echo "\nHELLO HELLO\n"', shell=True)
+                        self.is_command_writing = None
+                        session.commit()
 
     def _write_cmd(self, project):
 
-        print('..::CGS._write_cmd::.. at {}'.format(datetime.now()), flush=True)
-
         sub = self.submission
-        print('{} writing commands...'.format(datetime.now()), flush=True)
         sub.resolve_variable_values(project.dir_path)
 
         if not self.all_variables_resolved:
@@ -1503,9 +1377,6 @@ class CommandGroupSubmission(Base):
         sch_group_idx = sch_group_cmd_group['scheduler_group_idx']
         task_step_size = sch_group_cmd_group['task_step_size']
 
-        print('sch_groups')
-        pprint(sch_groups)
-
         sub_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(sub.workflow.id_),
             'submit_{}'.format(sub.id_)
@@ -1519,16 +1390,8 @@ class CommandGroupSubmission(Base):
 
     def write_variable_files(self, var_vals, task_step_size, sch_group_dir):
 
-        print('..::CGS.write_variable_files::..')
-
-        print('task_step_size: {}'.format(task_step_size))
-        print('sch_group_dir: {}'.format(sch_group_dir))
-
         task_multi = self.get_task_multiplicity()
         var_group_len = 1 if self.command_group.is_job_array else task_multi
-
-        print('task_multi: {}'.format(task_multi))
-        print('var_group_len: {}'.format(var_group_len))
 
         task_idx = 0
         var_vals_file_dat = {}
@@ -1554,15 +1417,10 @@ class CommandGroupSubmission(Base):
 
             task_idx += task_step_size
 
-        print('var_vals_file_dat')
-        pprint(var_vals_file_dat)
-
         for task_idx, var_vals_file in var_vals_file_dat.items():
 
             var_vals_dir = sch_group_dir.joinpath(
                 'var_values', str(task_idx + 1))
-
-            print('var_vals_dir: {}'.format(var_vals_dir))
 
             for var_name, var_val_all in var_vals_file.items():
 
@@ -1628,34 +1486,19 @@ class CommandGroupSubmission(Base):
         """Archive the working directory associated with a given task in this
         command group submission."""
 
-        print('..::CGS.archive()::...')
-
-        print('task_idx: {}'.format(task_idx))
-
         sub = self.submission
         scheduler_groups = sub.workflow.get_scheduler_groups(sub)
-        print('scheduler groups')
-        pprint(scheduler_groups)
 
         sch_group = scheduler_groups['command_groups'][
             self.command_group_exec_order]
 
-        print('sch_group: {}'.format(sch_group))
-
         task_step_size = sch_group['task_step_size']
-        print('task_step_size: {}'.format(task_step_size))
 
         max_num_tasks = scheduler_groups['max_num_tasks'][
             sch_group['scheduler_group_idx']]
 
         dir_idx = floor(
             ((task_idx - 1) / max_num_tasks) * len(self.directories))
-
-        print('dirs:')
-        pprint(self.directories)
-
-        print('dir values:')
-        pprint(self.directory_values)
 
         dir_val = self.directories[dir_idx]
 
@@ -1735,31 +1578,20 @@ class Archive(Base):
         wait_time = 10
         blocked = True
         while blocked:
-            print('in while blocked')
             session.refresh(self)
             if directory_value in self.directories_archiving:
                 sleep(wait_time)
-                print('directory is currently archiving...wait...')
             else:
-                print('directory is NOT archiving...')
                 try:
-                    print('add directory value to is_archiving')
                     self.directories_archiving.append(directory_value)
-                    print('committing to session')
                     session.commit()
                     blocked = False
                 except IntegrityError:
-                    print('could not add, already exists...wait...')
-                    print('rolling back session.')
                     session.rollback()
                     sleep(wait_time)
                 if not blocked:
-                    print('No block...START archive for {}'.format(
-                        directory_value.value))
                     self._copy(src_dir, dst_dir, exclude)
-                    print('Removing from is_archiving')
                     self.directories_archiving.remove(directory_value)
-                    print('committing to session.')
                     session.commit()
 
     def _copy(self, src_dir, dst_dir, exclude):
@@ -1770,11 +1602,7 @@ class Archive(Base):
 
         """
 
-        print(':_copy:')
-        print('src_dir: {}'.format(src_dir))
-        print('dst_dir: {}'.format(dst_dir))
-
-        # TODO: later (safely) copy the database to archive as well
+        # TODO: later (safely) copy the database to archive as well?
         ignore = [CONFIG['hpcflow_directory']] + (exclude or [])
 
         if ignore:
@@ -1783,12 +1611,10 @@ class Archive(Base):
             ignore_func = None
 
         start = datetime.now()
-        print('{}: copy start'.format(start))
         copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
         end = datetime.now()
-        print('{}: copy end'.format(end))
         copy_seconds = (end - start).total_seconds()
-        print('copy seconds: {}'.format(copy_seconds))
+        print('Archive took {} seconds'.format(copy_seconds))
 
 
 class IsCommandWriting(Base):
