@@ -130,7 +130,7 @@ def clean(directory=None, yes=True):
 @click.argument('profiles', nargs=-1, type=click.Path(exists=True))
 def make(directory=None, profiles=None, json_file=None, json=None):
     """Generate a new Workflow."""
-    print('hpcflow.cli.make')
+    print('hpcflow.cli.make', flush=True)
 
     workflow_id = api.make_workflow(
         dir_path=directory,
@@ -147,7 +147,7 @@ def make(directory=None, profiles=None, json_file=None, json=None):
 @click.option('--task', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
 def write_cmd(cmd_group_sub_id, task=None, directory=None):
-    print('hpcflow.cli.write_cmd')
+    print('hpcflow.cli.write_cmd', flush=True)
     api.write_cmd(
         cmd_group_sub_id,
         task,
@@ -160,7 +160,7 @@ def write_cmd(cmd_group_sub_id, task=None, directory=None):
 @click.option('--task', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
 def archive(cmd_group_sub_id, task, directory=None):
-    print('hpcflow.cli.archive')
+    print('hpcflow.cli.archive', flush=True)
     api.archive(
         cmd_group_sub_id,
         task,
@@ -188,7 +188,7 @@ def submit(directory=None, workflow_id=None, task_ranges=None, profiles=None,
            json_file=None, json=None):
     """Submit(and optionally generate) a Workflow."""
 
-    print('hpcflow.cli.submit')
+    print('hpcflow.cli.submit', flush=True)
     # print('task_ranges')
     # pprint(task_ranges)
 

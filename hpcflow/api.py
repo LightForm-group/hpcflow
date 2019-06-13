@@ -187,6 +187,7 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
         is the working (i.e. invoking) directory.
 
     """
+    print('..::api.write_cmd::..', flush=True)
 
     project = Project(dir_path)
     Session = init_db(project.db_uri, check_exists=True)
@@ -194,9 +195,11 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
 
-    # print('cg_sub: {}'.format(cg_sub))
+    print('cg_sub: {}'.format(cg_sub), flush=True)
 
-    cg_sub.write_cmd(project, session)
+    cg_sub.write_cmd(project)
+
+    print('finished writing commands, committing and closing session.', flush=True)
 
     session.commit()
     session.close()
@@ -215,7 +218,7 @@ def archive(cmd_group_sub_id, task, dir_path=None):
         will be archived).
     dir_path : str or Path, optional
         The directory in which the Workflow will be generated. By default, this
-        is the working (i.e. invoking) directory.    
+        is the working (i.e. invoking) directory.
 
     """
 
@@ -231,7 +234,7 @@ def archive(cmd_group_sub_id, task, dir_path=None):
 
     print('cg_sub: {}'.format(cg_sub))
 
-    cg_sub.archive(task, session)
+    cg_sub.archive(task)
 
     session.commit()
     session.close()
