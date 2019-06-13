@@ -1536,6 +1536,7 @@ class Archive(Base):
         self.path = path
         self.host = host
 
+
 class Project(object):
 
     DB_URI = 'sqlite:///{}/workflows.db'
