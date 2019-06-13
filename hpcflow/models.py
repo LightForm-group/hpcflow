@@ -1530,6 +1530,8 @@ class CommandGroupSubmission(Base):
         """Archive the working directory associated with a given task in this
         command group submission."""
 
+        print('..::CGS.archive()::...')
+
         sub = self.submission
         scheduler_groups = sub.workflow.get_scheduler_groups(sub)
         sch_group = scheduler_groups['command_groups'][
@@ -1605,28 +1607,37 @@ class Archive(Base):
         directory_value : VarValue
 
         """
-        wait_time = 10
-        blocked = True
-        while blocked:
-            if directory_value in self.directories_archiving:
-                sleep(wait_time)
-            else:
-                try:
-                    self.directories_archiving.append(directory_value)
-                    blocked = False
-                except IntegrityError:
-                    sleep(wait_time)
-                if not blocked:
-                    self._copy(directory_value, exclude)
-                    self.directories_archiving.remove(directory_value)
-
-    def _copy(self, directory_value, exclude):
-        """Do the actual copying."""
-
         root_dir = self.command_groups[0].workflow.directory
         src_dir = root_dir.joinpath(directory_value.value)
         dst_dir = Path(self.path).joinpath(directory_value.value)
 
+        wait_time = 10
+        blocked = True
+        while blocked:
+            print('in while blocked')
+            if directory_value in self.directories_archiving:
+                sleep(wait_time)
+                print('directory is currently archiving...wait...')
+            else:
+                print('directory is NOT archiving...')
+                try:
+                    print('add directory value to is_archiving')
+                    self.directories_archiving.append(directory_value)
+                    blocked = False
+                except IntegrityError:
+                    print('could not add, already exists...wait...')
+                    sleep(wait_time)
+                if not blocked:
+                    print('No block...START archive for {}'.format(
+                        directory_value.value))
+                    self.directories_archiving.remove(directory_value)
+                    self._copy(src_dir, dst_dir, exclude)
+                    
+
+    def _copy(self, src_dir, dst_dir, exclude):
+        """Do the actual copying."""
+        
+        print(':_copy:')
         print('src_dir: {}'.format(src_dir))
         print('dst_dir: {}'.format(dst_dir))
 
