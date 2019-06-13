@@ -1649,6 +1649,8 @@ class Archive(Base):
                     blocked = False
                 except IntegrityError:
                     print('could not add, already exists...wait...')
+                    print('rolling back session.')
+                    session.rollback()                    
                     sleep(wait_time)
                 if not blocked:
                     print('No block...START archive for {}'.format(
