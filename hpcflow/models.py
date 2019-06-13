@@ -8,12 +8,15 @@ from pathlib import Path
 from math import ceil, floor
 from pprint import pprint
 from subprocess import run, PIPE
+from time import sleep
+from shutil import ignore_patterns
 
 from sqlalchemy import (
     Table, Column, Integer, DateTime, JSON, ForeignKey, Boolean, Enum, String,
     select, UniqueConstraint
 )
 from sqlalchemy.orm import relationship, deferred
+from sqlalchemy.exc import IntegrityError
 
 from hpcflow import CONFIG
 from hpcflow.base_db import Base
@@ -24,6 +27,7 @@ from hpcflow.variables import (
     extract_variable_names, resolve_variable_values, UnresolvedVariableError
 )
 from hpcflow.utils import coerce_same_length, zeropad
+from hpcflow.copytree import copytree_multi
 
 archive_is_active = Table(
     'archive_is_active',
@@ -1001,7 +1005,7 @@ class Submission(Base):
                 if j['scheduler_group_idx'] == i:
 
                     cg_sub = self.command_group_submissions[cmd_group_idx]
-                    dir_vals = cg_sub.directories
+                    dir_vals = cg_sub.directory_values
                     all_dir_slots = [''] * max_tasks_i
                     # Distribute dirs over num_dir_slots:
                     for k in range(0, max_tasks_i, j['task_step_size']):
@@ -1166,16 +1170,28 @@ class CommandGroupSubmission(Base):
         return num
 
     @property
-    def directories(self):
+    def directory_values(self):
         """Get the directories associated with this command group 
         submission."""
+
+        dir_vals = [i.value for i in self.directories]
+        return dir_vals
+
+    @property
+    def directories(self):
+        """Get the directory variable values associated with this command group 
+        submission.
+
+        TODO: do we need to order these?
+
+        """
 
         dir_vars_all = self.command_group.directory_variable.variable_values
         # Get only those with correct submission
         dirs = []
         for i in dir_vars_all:
             if i.submission == self.submission:
-                dirs.append(i.value)
+                dirs.append(i)
 
         return dirs
 
@@ -1356,12 +1372,20 @@ class CommandGroupSubmission(Base):
             '. $SUBMIT_DIR/{}'.format(cmd_fn)
         ]
 
+        arch_lns = []
+        if self.command_group.archive:
+            arch_lns = [
+                'hpcflow archive -d `pwd` -t $SGE_TASK_ID {}'.format(self.id_),
+                ''
+            ]
+
         js_lines = (shebang + [''] +
                     sge_opts + [''] +
                     arr_opts + [''] +
                     write_cmd_exec + [''] +
                     loads + [''] +
-                    cmd_exec + [''])
+                    cmd_exec + [''] +
+                    arch_lns)
 
         # Write jobscript:
         with js_path.open('w') as handle:
@@ -1501,6 +1525,22 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
+    def archive(self, task_idx):
+        """Archive the working directory associated with a given task in this
+        command group submission."""
+
+        sub = self.submission
+        scheduler_groups = sub.workflow.get_scheduler_groups(sub)
+        sch_group = scheduler_groups['command_groups'][
+            self.command_group_exec_order]
+
+        task_step_size = sch_group['task_step_size']
+        dir_idx = int((task_idx - 1) / task_step_size)
+        dir_val = self.directories[dir_idx]
+
+        exclude = self.command_group.archive_excludes
+        self.command_group.archive.execute(dir_val, exclude)
+
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""
@@ -1556,6 +1596,48 @@ class Archive(Base):
         self.path = path
         self.host = host
 
+    def execute(self, directory_value, exclude):
+        """Execute the archive process of a given working directory.
+
+        Parameters
+        ----------
+        directory_value : VarValue
+
+        """
+        wait_time = 10
+        blocked = True
+        while blocked:
+            if directory_value in self.directories_archiving:
+                sleep(wait_time)
+            else:
+                try:
+                    self.directories_archiving.append(directory_value)
+                    blocked = False
+                except IntegrityError:
+                    sleep(wait_time)
+                if not blocked:
+                    self._copy(directory_value, exclude)
+                    self.directories_archiving.remove(directory_value)
+
+    def _copy(self, directory_value, exclude):
+        """Do the actual copying."""
+        
+        root_dir = self.command_groups[0].workflow.directory
+        src_dir = root_dir.joinpath(directory_value.value)
+        dst_dir = Path(self.path).joinpath(directory_value.value)
+
+        print('src_dir: {}'.format(src_dir))
+        print('dst_dir: {}'.format(dst_dir))
+        
+        # TODO: later (safely) copy the database to archive as well
+        ignore = [CONFIG['hpcflow_directory']] + (exclude or [])
+
+        if ignore:
+            ignore_func = ignore_patterns(*ignore)
+        else:
+            ignore_func = None
+
+        copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
 
 class Project(object):
 

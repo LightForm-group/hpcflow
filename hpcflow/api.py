@@ -200,3 +200,31 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
 
     session.commit()
     session.close()
+
+
+def archive(cmd_group_sub_id, task, dir_path=None):
+    """Initiate an archive of a given task.
+
+    Parameters
+    ----------
+    cmd_group_sub_id : int
+        ID of the command group submission for which an archive is to be
+        started.
+    task : int
+        The task to be archived (or rather, the task whose working directory
+        will be archived).
+    dir_path : str or Path, optional
+        The directory in which the Workflow will be generated. By default, this
+        is the working (i.e. invoking) directory.    
+
+    """
+
+    project = Project(dir_path)
+    Session = init_db(project.db_uri, check_exists=True)
+    session = Session()
+
+    cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
+    cg_sub.archive(task)
+
+    session.commit()
+    session.close()

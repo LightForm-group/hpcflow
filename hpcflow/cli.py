@@ -156,6 +156,19 @@ def write_cmd(cmd_group_sub_id, task=None, directory=None):
 
 
 @cli.command()
+@click.option('--directory', '-d')
+@click.option('--task', '-t', type=click.INT)
+@click.argument('cmd_group_sub_id', type=click.INT)
+def archive(cmd_group_sub_id, task, directory=None):
+    print('hpcflow.cli.archive')
+    api.archive(
+        cmd_group_sub_id,
+        task,
+        directory
+    )
+
+
+@cli.command()
 def stat():
     """Show the status of running tasks and the number completed tasks."""
     print('hpcflow.cli.stat')
