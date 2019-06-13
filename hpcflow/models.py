@@ -1395,7 +1395,7 @@ class CommandGroupSubmission(Base):
 
         return js_path
 
-    def write_cmd(self, project):
+    def write_cmd(self, project, session):
         """Write all files necessary to execute the commands of this command
         group."""
 
@@ -1403,6 +1403,7 @@ class CommandGroupSubmission(Base):
             return
         else:
             self.commands_written = True
+            session.commit()
 
         sub = self.submission
         sub.resolve_variable_values(project.dir_path)

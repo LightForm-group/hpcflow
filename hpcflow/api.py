@@ -196,7 +196,7 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
 
     # print('cg_sub: {}'.format(cg_sub))
 
-    cg_sub.write_cmd(project)
+    cg_sub.write_cmd(project, session)
 
     session.commit()
     session.close()
