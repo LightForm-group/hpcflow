@@ -1621,14 +1621,14 @@ class Archive(Base):
 
     def _copy(self, directory_value, exclude):
         """Do the actual copying."""
-        
+
         root_dir = self.command_groups[0].workflow.directory
         src_dir = root_dir.joinpath(directory_value.value)
         dst_dir = Path(self.path).joinpath(directory_value.value)
 
         print('src_dir: {}'.format(src_dir))
         print('dst_dir: {}'.format(dst_dir))
-        
+
         # TODO: later (safely) copy the database to archive as well
         ignore = [CONFIG['hpcflow_directory']] + (exclude or [])
 
@@ -1638,6 +1638,7 @@ class Archive(Base):
             ignore_func = None
 
         copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
+
 
 class Project(object):
 
