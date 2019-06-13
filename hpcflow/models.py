@@ -25,6 +25,23 @@ from hpcflow.variables import (
 )
 from hpcflow.utils import coerce_same_length, zeropad
 
+archive_is_active = Table(
+    'archive_is_active',
+    Base.metadata,
+    Column(
+        'archive_id',
+        Integer,
+        ForeignKey('archive.id'),
+        primary_key=True
+    ),
+    Column(
+        'directory_value_id',
+        Integer,
+        ForeignKey('var_value.id'),
+        primary_key=True
+    ),
+)
+
 
 class Workflow(Base):
     """Class to represent a Workflow."""
@@ -377,8 +394,8 @@ class Workflow(Base):
             qsub_cmd = [sumbit_cmd]
 
             if idx > 0:
-                
-                # Add conditional submission:                
+
+                # Add conditional submission:
                 if cg_sub.command_group.nesting == NestingType('hold'):
                     hold_arg = '-hold_jid'
                 else:
@@ -410,7 +427,7 @@ class Workflow(Base):
                 raise ValueError(msg.format(js_path))
 
             last_submit_id = job_id_str
-            print('last_submit_id: {}'.format(last_submit_id))        
+            print('last_submit_id: {}'.format(last_submit_id))
 
         return sub
 
@@ -734,7 +751,7 @@ class VarDefinition(Base):
     def get_multiplicity(self, submission):
         """Get the value multiplicity of this variable for a given
         submission.
-        
+
         TODO: this should first try to get multiplicity from values (as a
         function of cmd group directory?)
 
@@ -763,7 +780,7 @@ class VarDefinition(Base):
             raise ValueError('bad 3!')
 
         return var_length
-        
+
     def get_values(self, directory):
         """Get the values of this variable.
 
@@ -1062,13 +1079,13 @@ class CommandGroupSubmission(Base):
             cg_dirs = self.command_group.directory_variable.variable_values
             for j in var_vals_i:
                 val_dir_val = j.directory_value
-                
+
                 for k in cg_dirs:
 
-                    if val_dir_val == k:                        
-                        
+                    if val_dir_val == k:
+
                         if val_dir_val.value in var_vals_dat_ii:
-                            
+
                             if i.name in var_vals_dat_ii[val_dir_val.value]:
 
                                 var_vals_dat_ii[val_dir_val.value][i.name].append(
@@ -1169,7 +1186,7 @@ class CommandGroupSubmission(Base):
         for i in self.command_group.var_definitions:
             if i.name == var_name:
                 return i
-    
+
     def get_task_multiplicity(self):
         """Get the number of tasks associated with this command group
         submission."""
@@ -1191,7 +1208,7 @@ class CommandGroupSubmission(Base):
             raise ValueError('bad 5!')
 
         return task_multi
-    
+
     def get_num_outputs(self, num_inputs=None):
         """Get the number of output tasks of this command group.
 
@@ -1226,7 +1243,7 @@ class CommandGroupSubmission(Base):
         # print('\n:CGS:get_num_outputs: num_inputs: {}'.format(num_inputs))
 
         if self.all_variables_resolved:
-            
+
             # print('\tall_variables_resolved')
 
             if self.command_group.is_job_array:
@@ -1234,14 +1251,14 @@ class CommandGroupSubmission(Base):
                 num_outputs = len(var_vals)
 
             elif self.command_group.is_job_array == False:
-                
+
                 if self.command_group.nesting == NestingType('nest'):
                     num_outputs = num_inputs
                 elif self.command_group.nesting == NestingType('hold'):
                     num_outputs = 1
                 elif self.command_group.nesting is None:
                     num_outputs = 1
-            
+
             else:
                 num_outputs = num_inputs
 
@@ -1311,7 +1328,7 @@ class CommandGroupSubmission(Base):
                         '/working_dirs_{}{}').format(
                             self.command_group_exec_order,
                             CONFIG['working_dirs_file_ext']
-                        )
+        )
 
         cmd_group = self.command_group
 
@@ -1366,7 +1383,7 @@ class CommandGroupSubmission(Base):
 
         if not self.all_variables_resolved:
             msg = ('Not all variables values have been resolved for this command '
-                'group; cannot write command files.')
+                   'group; cannot write command files.')
             raise ValueError(msg)
 
         var_vals = self.get_variable_values_normed()
@@ -1384,12 +1401,12 @@ class CommandGroupSubmission(Base):
 
         sch_group_dir = sub_dir.joinpath(
             'scheduler_group_{}'.format(sch_group_idx))
-      
+
         self.write_variable_files(var_vals, task_step_size, sch_group_dir)
         self.write_cmd_file(sch_group_idx, sub_dir)
 
     def write_variable_files(self, var_vals, task_step_size, sch_group_dir):
-        
+
         task_multi = self.get_task_multiplicity()
         var_group_len = 1 if self.command_group.is_job_array else task_multi
 
@@ -1426,7 +1443,8 @@ class CommandGroupSubmission(Base):
 
             for var_name, var_val_all in var_vals_file.items():
 
-                var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
+                var_fn = 'var_{}{}'.format(
+                    var_name, CONFIG['variable_file_ext'])
                 var_file_path = var_vals_dir.joinpath(var_fn)
 
                 with var_file_path.open('w') as handle:
@@ -1434,7 +1452,7 @@ class CommandGroupSubmission(Base):
                         handle.write('{}\n'.format(i))
 
     def write_cmd_file(self, scheduler_group_idx, dir_path):
-        
+
         lns_while_start = [
             'while true',
             'do'
@@ -1459,8 +1477,8 @@ class CommandGroupSubmission(Base):
 
             var_fn = 'var_{}{}'.format(i.name, CONFIG['variable_file_ext'])
             var_file_path = ('$SUBMIT_DIR/scheduler_group_{}/var_values'
-                            '/$SGE_TASK_ID/{}').format(
-                                scheduler_group_idx, var_fn)
+                             '/$SGE_TASK_ID/{}').format(
+                scheduler_group_idx, var_fn)
 
             lns_read.append('\tread -u{} {} || break'.format(fd_idx, i.name))
 
@@ -1470,18 +1488,18 @@ class CommandGroupSubmission(Base):
             lns_fds.append('\t{}< {}'.format(fd_idx, var_file_path))
 
         cmd_lns = (lns_while_start + [''] +
-                lns_read + [''] +
-                lns_cmd + [''] +
-                lns_while_end +
-                lns_fds + [''])
+                   lns_read + [''] +
+                   lns_cmd + [''] +
+                   lns_while_end +
+                   lns_fds + [''])
 
         cmd_lns = '\n'.join(cmd_lns)
 
         cmd_fn = 'cmd_{}{}'.format(self.command_group_exec_order,
-                                CONFIG['jobscript_ext'])
+                                   CONFIG['jobscript_ext'])
         cmd_path = dir_path.joinpath(cmd_fn)
         with cmd_path.open('w') as handle:
-            handle.write(cmd_lns)                              
+            handle.write(cmd_lns)
 
 
 class VarValue(Base):
@@ -1529,6 +1547,8 @@ class Archive(Base):
     host = Column(String(255), nullable=True)
 
     command_groups = relationship('CommandGroup', back_populates='archive')
+    directories_archiving = relationship(
+        'VarValue', secondary=archive_is_active)
 
     def __init__(self, name, path, host=''):
 
@@ -1556,6 +1576,3 @@ class Project(object):
     def clean(self):
         if self.hf_dir.exists():
             shutil.rmtree(str(self.hf_dir))
-
-
-
