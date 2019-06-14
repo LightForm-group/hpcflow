@@ -1288,7 +1288,8 @@ class CommandGroupSubmission(Base):
         ]
 
         write_cmd_exec = [
-            'hpcflow write-cmd -d `pwd` {0:} > $LOG_PATH 2>&1'.format(self.id_),
+            ('hpcflow write-cmd -d `pwd` {0:} > '
+             '$LOG_PATH 2>&1').format(self.id_),
         ]
 
         loads = ['module load {}'.format(i)
