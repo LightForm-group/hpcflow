@@ -10,11 +10,11 @@ from pathlib import Path
 from pprint import pprint
 import json
 
-from hpcflow.models import (Workflow, Project, Submission,
-                            CommandGroupSubmission)
-from hpcflow.init_db import init_db
-from hpcflow.profiles import parse_job_profiles
 from hpcflow import CONFIG, profiles
+from hpcflow.init_db import init_db
+from hpcflow.models import Workflow, Submission, CommandGroupSubmission
+from hpcflow.profiles import parse_job_profiles
+from hpcflow.project import Project
 
 
 def make_workflow(dir_path=None, profile_list=None, json_file=None,
