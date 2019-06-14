@@ -35,6 +35,8 @@ CMD_GROUP_KEYS_REQ = [
 ]
 
 CMD_GROUP_KEYS_GOOD = CMD_GROUP_KEYS_REQ + [
+    'archive',
+    'archive_excludes',
     'directory',
     'is_job_array',
     'modules',
