@@ -1558,7 +1558,7 @@ class Archive(Base):
     id_ = Column('id', Integer, primary_key=True)
     name = Column(String(255))
     path = Column(String(255))
-    host = Column(String(255), nullable=True)
+    host = Column(String(255))
 
     command_groups = relationship('CommandGroup', back_populates='archive')
     directories_archiving = relationship(
