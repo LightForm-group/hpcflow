@@ -1,6 +1,6 @@
 # [WIP] hpcflow
 
-This is a work-in-progress and not currently suitable for real-world use.
+❗ This is a work-in-progress and not quite ready for real-world use.
 
 ## Installation
 
@@ -68,7 +68,7 @@ If multiple channels merge into one command group, the channel of the resulting 
 
 #### Submit-time versus run-time
 
-There are two times of importance in the lifecycle of a Workflow command group. To enable automation of the Workflow, all command groups are generally submitted at the same time, with holding rules that prevent their execution until (part of) the parent command group has completed.
+There are two times of importance in the life cycle of a Workflow command group. To enable automation of the Workflow, all command groups are generally submitted at the same time, with holding rules that prevent their execution until (part of) the parent command group has completed.
 
 #### Profile settings
 
