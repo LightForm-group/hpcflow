@@ -8,9 +8,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
-from time import sleep
-from datetime import datetime
 from shutil import ignore_patterns
+from time import sleep
 
 from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
                         UniqueConstraint)
