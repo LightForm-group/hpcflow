@@ -125,3 +125,5 @@ dmypy.json
 # VS Code
 /.vscode
 *.code-workspace
+
+failure_examples/
