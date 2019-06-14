@@ -17,7 +17,7 @@ from sqlalchemy import (
     select, UniqueConstraint
 )
 from sqlalchemy.orm import relationship, deferred, Session
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from hpcflow import CONFIG
 from hpcflow.base_db import Base
@@ -1350,6 +1350,12 @@ class CommandGroupSubmission(Base):
                         blocked = False
 
                     except IntegrityError:
+                        # Another process has already set `is_command_writing`
+                        session.rollback()
+                        sleep(sleep_time)
+
+                    except OperationalError:
+                        # Database is likely locked.
                         session.rollback()
                         sleep(sleep_time)
 
@@ -1595,7 +1601,14 @@ class Archive(Base):
                     self.directories_archiving.append(directory_value)
                     session.commit()
                     blocked = False
+
                 except IntegrityError:
+                    # Another process has already set `directories_archiving`
+                    session.rollback()
+                    sleep(wait_time)
+
+                except OperationalError:
+                    # Database is likely locked.
                     session.rollback()
                     sleep(wait_time)
 
