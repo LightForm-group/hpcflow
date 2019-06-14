@@ -125,7 +125,7 @@ Here is a list of `hpcflow` (sub-)commands. Type `<command> --help` to show the 
 
 ## Database schema
 
-Here is a [link](https://app.sqldbm.com/MySQL/Share/QSowTs8bzbDKnSnryCZLfkGFrngIE8md_DYjF4jNYw0) to view the local SQLite database schema using the `sqldbm.com` web app. TODO: update to the most recent revision.
+Here is a [link](https://app.sqldbm.com/MySQL/Share/zcKfw4XqIlAxd5gBe-VZtEGFrngIE8md_DYjF4jNYw0) to view the local SQLite database schema using the `sqldbm.com` web app.
 
 ## Glossary
 
