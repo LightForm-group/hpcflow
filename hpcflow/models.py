@@ -1335,6 +1335,9 @@ class CommandGroupSubmission(Base):
             blocked = True
             while blocked:
 
+                print('{} Writing command file blocked...'.format(
+                    datetime.now()), flush=True)
+
                 session.refresh(self)
 
                 if self.is_command_writing:
@@ -1553,7 +1556,9 @@ class Archive(Base):
 
     command_groups = relationship('CommandGroup', back_populates='archive')
     directories_archiving = relationship(
-        'VarValue', secondary=archive_is_active)
+        'VarValue',
+        secondary=archive_is_active
+    )
 
     def __init__(self, name, path, host=''):
 
@@ -1570,6 +1575,7 @@ class Archive(Base):
         exclude : list of str
 
         """
+
         root_dir = self.command_groups[0].workflow.directory
         src_dir = root_dir.joinpath(directory_value.value)
         dst_dir = Path(self.path).joinpath(directory_value.value)
@@ -1579,7 +1585,9 @@ class Archive(Base):
         wait_time = 10
         blocked = True
         while blocked:
+            print('{} Archiving blocked...'.format(datetime.now()), flush=True)
             session.refresh(self)
+
             if directory_value in self.directories_archiving:
                 sleep(wait_time)
             else:
@@ -1590,8 +1598,14 @@ class Archive(Base):
                 except IntegrityError:
                     session.rollback()
                     sleep(wait_time)
+
                 if not blocked:
-                    self._copy(src_dir, dst_dir, exclude)
+                    # Need to ensure the block is released if copying fails:
+                    try:
+                        self._copy(src_dir, dst_dir, exclude)
+                    except shutil.Error as err:
+                        print('Archive copying error: {}'.format(err))
+
                     self.directories_archiving.remove(directory_value)
                     session.commit()
 
@@ -1615,7 +1629,7 @@ class Archive(Base):
         copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
         end = datetime.now()
         copy_seconds = (end - start).total_seconds()
-        print('Archive took {} seconds'.format(copy_seconds))
+        print('Archive took {} seconds'.format(copy_seconds), flush=True)
 
 
 class IsCommandWriting(Base):
