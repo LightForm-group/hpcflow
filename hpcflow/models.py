@@ -88,7 +88,12 @@ class Workflow(Base):
             List of dicts representing archive locations. Each dict in
             `command_groups` may contain keys `archive_idx` (which is an
             index into `archives`) and `archive_excludes` (which is a list
-            of glob patterns to ignore when archiving).
+            of glob patterns to ignore when archiving). Each item in `archives`
+            contains the following keys:
+                name : str
+                host : str
+                path : str
+
         """
 
         # Command group directories must always be variables:

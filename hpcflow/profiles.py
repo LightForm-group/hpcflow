@@ -21,6 +21,37 @@ from hpcflow.variables import (
 )
 
 
+def resolve_archives(cmd_group, archives):
+    """Resolve archive definition from the config file and add to the archives
+    list"""
+
+    arch_name = cmd_group.pop('archive', None)
+    if arch_name:
+        arch_exc = cmd_group.get('archive_excludes')
+
+        try:
+            arch_defn = CONFIG['archives'][arch_name]
+        except KeyError:
+            msg = ('An archive called "{}" was not found in the '
+                   'configuration file. Available archives are: {}')
+            raise ValueError(msg.format(arch_name, CONFIG['archives']))
+
+        existing_idx = None
+        for k_idx, k in enumerate(archives):
+            if k['name'] == arch_name:
+                existing_idx = k_idx
+                break
+
+        if existing_idx is not None:
+            cmd_group['archive_idx'] = existing_idx
+        else:
+            archives.append({
+                'name': arch_name,
+                **arch_defn,
+            })
+            cmd_group['archive_idx'] = len(archives) - 1
+
+
 def parse_job_profiles(dir_path=None, profile_list=None):
     """Parse YAML file profiles into a form suitable for `models.Workflow`
     initialisation.
@@ -71,32 +102,6 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         exec_order_add = len(command_groups)
         for j in i['command_groups']:
 
-            # Resolve archive locations from CONFIG file
-            # Add archive_idx and archive_exclude; remove archive
-            arch = j.pop('archive', None)
-            if arch:
-                arch_name = arch['name']
-                arch_exc = arch.get('exclude')
-                arch_loc = CONFIG['archive_locations'][arch_name]
-
-                existing_idx = None
-                for k_idx, k in enumerate(archives):
-                    if k['name'] == arch_name:
-                        existing_idx = k_idx
-                        break
-
-                if existing_idx is not None:
-                    j['archive_idx'] = existing_idx
-                else:
-                    archives.append({
-                        'name': arch_name,
-                        **arch_loc,
-                    })
-                    j['archive_idx'] = len(archives) - 1
-
-                if arch_exc:
-                    j['archive_excludes'] = arch_exc
-
             # Populate with defaults first:
             cmd_group = {
                 **CMD_GROUP_DEFAULTS,
@@ -109,6 +114,8 @@ def parse_job_profiles(dir_path=None, profile_list=None):
             cmd_group.update(**j)
             cmd_group['exec_order'] += exec_order_add
             profile_cmd_groups.append(cmd_group)
+
+            resolve_archives(cmd_group, archives)
 
         command_groups.extend(profile_cmd_groups)
 

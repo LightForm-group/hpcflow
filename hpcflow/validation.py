@@ -18,6 +18,7 @@ PROFILE_KEYS_REQ = [
 PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
     'alternate_scratch',
     'archive',
+    'archive_excludes',
     'directory',
     'inherits',
     'is_job_array',
@@ -50,6 +51,8 @@ CMD_GROUP_DEFAULTS = {
     'is_job_array': True,
     'nesting': None,
     'directory': '',
+    'archive': None,
+    'archive_excludes': [],
 }
 
 
