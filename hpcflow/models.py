@@ -56,7 +56,7 @@ class Workflow(Base):
     id_ = Column('id', Integer, primary_key=True)
     create_time = Column(DateTime)
     pre_commands = Column(JSON)
-    _directory = Column(String(255))
+    _directory = Column('directory', String(255))
 
     command_groups = relationship(
         'CommandGroup',
