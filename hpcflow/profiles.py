@@ -51,6 +51,9 @@ def resolve_archives(cmd_group, archives):
             })
             cmd_group['archive_idx'] = len(archives) - 1
 
+    else:
+        cmd_group.pop('archive_excludes', None)
+
 
 def parse_job_profiles(dir_path=None, profile_list=None):
     """Parse YAML file profiles into a form suitable for `models.Workflow`
