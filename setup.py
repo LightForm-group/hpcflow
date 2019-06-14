@@ -24,6 +24,15 @@ def get_version():
     return ver_str
 
 
+def get_long_description():
+
+    readme_file = 'README.md'
+    with open(readme_file, encoding='utf-8') as handle:
+        contents = handle.read()
+
+    return contents
+
+
 package_data = [
     os.path.join(*os.path.join(root, f).split(os.path.sep)[1:])
     for root, dirs, files in os.walk(os.path.join(package_name, 'data'))
@@ -33,10 +42,13 @@ package_data = [
 setup(
     name=package_name,
     version=get_version(),
-    description=('A Python package to generate and submit jobscripts for '
-                 'an automated "simulate -> process -> archive" workflow on '
-                 'high performance computing (HPC) systems.'),
+    description=('Generate and submit jobscripts for an automated simulate, '
+                 'process, archive workflow on high performance computing '
+                 '(HPC) systems.'),
+    long_description=get_long_description(),
+    long_description_content_type='text/markdown',
     author='Adam J. Plowman',
+    author_email='adam.plowman@manchester.ac.uk',
     packages=find_packages(),
     package_data={
         package_name: package_data,
@@ -47,7 +59,13 @@ setup(
         'sqlalchemy==1.3.2',
     ],
     classifiers=[
-        'Development Status :: 4 - Beta'
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Operating System :: OS Independent',
     ],
     entry_points="""
         [console_scripts]
