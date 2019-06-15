@@ -13,6 +13,16 @@ from hpcflow import __version__
 from hpcflow import api
 
 
+def validate_cloud_provider(ctx, param, value):
+
+    good_providers = ['dropbox']
+    if value not in good_providers:
+        msg = ('`provider` must be one of: {}'.format(good_providers))
+        raise click.BadParameter(msg)
+
+    return value
+
+
 def validate_task_ranges(ctx, param, value):
     """Validate the task range.
 

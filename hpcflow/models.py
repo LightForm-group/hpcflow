@@ -113,6 +113,7 @@ class Workflow(Base):
         ]
 
         # Generate Archive objects:
+        archive_objs = None
         if archives:
             archive_objs = [Archive(**kwargs) for kwargs in archives]
 
@@ -141,7 +142,7 @@ class Workflow(Base):
         self.pre_commands = pre_commands
         self._directory = str(directory)
 
-        self.validate()
+        self.validate(archive_objs)
 
         self._execute_pre_commands()
 
@@ -160,7 +161,7 @@ class Workflow(Base):
     def directory(self):
         return Path(self._directory)
 
-    def validate(self):
+    def validate(self, archive_objs):
         cmd_group_list = []
         for i in self.command_groups:
             cmd_group_list.append({
@@ -177,6 +178,12 @@ class Workflow(Base):
             cmd_group.is_job_array = i['is_job_array']
             cmd_group.exec_order = i['exec_order']
             cmd_group.nesting = i['nesting']
+
+        # If using an Archive with a cloud provider, check access:
+        for i in archive_objs:
+            if i.cloud_provider != 'null':
+                print('Cloud provider archive!')
+                i.cloud_provider.check_access()
 
     def get_scheduler_groups(self, submission):
         """Resolve the scheduler groups for the Workflow.

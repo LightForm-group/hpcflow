@@ -57,6 +57,7 @@ setup(
         'click==7.0',
         'pyyaml',
         'sqlalchemy==1.3.2',
+        'dropbox',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

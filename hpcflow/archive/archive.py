@@ -5,6 +5,7 @@ This module contains a database model class for the archiving capabilities.
 """
 
 import shutil
+import enum
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
@@ -12,13 +13,17 @@ from shutil import ignore_patterns
 from time import sleep
 
 from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
-                        UniqueConstraint)
+                        UniqueConstraint, Enum)
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from hpcflow import CONFIG
+from hpcflow.archive.cloud.cloud import CloudProvider
+from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
+from hpcflow.archive.errors import ArchiveError
 from hpcflow.base_db import Base
 from hpcflow.copytree import copytree_multi
+
 
 archive_is_active = Table(
     'archive_is_active',
@@ -50,6 +55,7 @@ class Archive(Base):
     name = Column(String(255))
     path = Column(String(255))
     host = Column(String(255))
+    cloud_provider = Column(Enum(CloudProvider))
 
     command_groups = relationship('CommandGroup', back_populates='archive')
     directories_archiving = relationship(
@@ -57,11 +63,12 @@ class Archive(Base):
         secondary=archive_is_active
     )
 
-    def __init__(self, name, path, host=''):
+    def __init__(self, name, path, host='', cloud_provider=''):
 
         self.name = name
         self.path = path
         self.host = host
+        self.cloud_provider = CloudProvider(cloud_provider)
 
     def execute(self, directory_value, exclude):
         """Execute the archive process of a given working directory.
@@ -104,17 +111,15 @@ class Archive(Base):
                     sleep(wait_time)
 
                 if not blocked:
-                    # Need to ensure the block is released if copying fails:
-                    try:
-                        self._copy(src_dir, dst_dir, exclude)
-                    except shutil.Error as err:
-                        print('Archive copying error: {}'.format(err))
-
+                    self._copy(src_dir, dst_dir, exclude)
                     self.directories_archiving.remove(directory_value)
                     session.commit()
 
     def _copy(self, src_dir, dst_dir, exclude):
         """Do the actual copying.
+
+        Need to ensure this function catches all exceptions, so the block is
+        released if copying fails.
 
         TODO: does copytree overwrite all files or just copy
         non-existing files?
@@ -124,14 +129,31 @@ class Archive(Base):
         """
 
         ignore = [CONFIG['hpcflow_directory']] + (exclude or [])
-
-        if ignore:
-            ignore_func = ignore_patterns(*ignore)
-        else:
-            ignore_func = None
-
         start = datetime.now()
-        copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
+
+        try:
+
+            if self.cloud_provider != 'null':
+                try:
+                    self.cloud_provider.upload(src_dir, dst_dir, ignore)
+                except (CloudProviderError, CloudCredentialsError,
+                        ArchiveError) as err:
+                    raise ArchiveError(err)
+            else:
+                if ignore:
+                    ignore_func = ignore_patterns(*ignore)
+                else:
+                    ignore_func = None
+                try:
+                    copytree_multi(str(src_dir), str(
+                        dst_dir), ignore=ignore_func)
+                except shutil.Error as err:
+                    raise ArchiveError(err)
+
+        except ArchiveError as err:
+            print('Archive copying error: {}'.format(err))
+
         end = datetime.now()
         copy_seconds = (end - start).total_seconds()
-        print('Archive took {} seconds'.format(copy_seconds), flush=True)
+        print('Archive to "{}" took {} seconds'.format(
+            self.name, copy_seconds), flush=True)
