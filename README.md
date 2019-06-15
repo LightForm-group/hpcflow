@@ -1,3 +1,7 @@
+<div style="text-align:center">
+    <img src="logo.svg"/>
+</div>
+
 # [WIP] hpcflow
 
 ❗ This is a work-in-progress and not quite ready for real-world use.
