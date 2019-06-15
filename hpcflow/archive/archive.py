@@ -62,6 +62,8 @@ class Archive(Base):
         'VarValue',
         secondary=archive_is_active
     )
+    workflow = relationship('Workflow', back_populates='root_archive',
+                            uselist=False)
 
     def __init__(self, name, path, host='', cloud_provider=''):
 
@@ -70,7 +72,20 @@ class Archive(Base):
         self.host = host
         self.cloud_provider = CloudProvider(cloud_provider)
 
-    def execute(self, directory_value, exclude):
+    def execute(self, exclude):
+        """Execute the archive process with no lock.
+
+        Parameters
+        ----------
+        exclude : list of str
+
+        """
+
+        src_dir = self.workflow.directory
+        dst_dir = self.path
+        self._copy(src_dir, dst_dir, exclude)
+
+    def execute_with_lock(self, directory_value, exclude):
         """Execute the archive process of a given working directory.
 
         Parameters

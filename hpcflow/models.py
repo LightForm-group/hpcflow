@@ -36,6 +36,8 @@ class Workflow(Base):
     create_time = Column(DateTime)
     pre_commands = Column(JSON)
     _directory = Column('directory', String(255))
+    root_archive_id = Column(Integer, ForeignKey('archive.id'), nullable=True)
+    root_archive_excludes = Column(JSON, nullable=True)
 
     command_groups = relationship(
         'CommandGroup',
@@ -45,9 +47,12 @@ class Workflow(Base):
     submissions = relationship('Submission', back_populates='workflow')
     variable_definitions = relationship('VarDefinition',
                                         back_populates='workflow')
+    root_archive = relationship('Archive', back_populates='workflow',
+                                uselist=False)
 
     def __init__(self, directory, command_groups, var_definitions=None,
-                 pre_commands=None, archives=None):
+                 pre_commands=None, archives=None, root_archive_idx=None,
+                 root_archive_excludes=None):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -72,10 +77,14 @@ class Workflow(Base):
                 name : str
                 host : str
                 path : str
+        root_archive_idx : int
+            Index into `archives` that sets the root archive for the workflow.
+        root_archive_excludes : list of str
+            File patterns to exclude from the root archive.
 
         """
 
-        # Command group directories must always be variables:
+        # Command group directories must be stored internally as variables:
         cmd_group_dir_vars = []
         for idx, i in enumerate(command_groups):
 
@@ -117,6 +126,10 @@ class Workflow(Base):
         if archives:
             archive_objs = [Archive(**kwargs) for kwargs in archives]
 
+        if root_archive_idx is not None:
+            self.root_archive = archive_objs[root_archive_idx]
+            self.root_archive_excludes = root_archive_excludes
+
         cmd_groups = []
         for i in command_groups:
 
@@ -145,6 +158,8 @@ class Workflow(Base):
         self.validate(archive_objs)
 
         self._execute_pre_commands()
+
+        self.do_root_archive()
 
     def get_variable_definition_by_name(self, variable_name):
         """Get the VarDefintion object using the variable name."""
@@ -182,7 +197,6 @@ class Workflow(Base):
         # If using an Archive with a cloud provider, check access:
         for i in archive_objs:
             if i.cloud_provider != 'null':
-                print('Cloud provider archive!')
                 i.cloud_provider.check_access()
 
     def get_scheduler_groups(self, submission):
@@ -489,6 +503,12 @@ class Workflow(Base):
             proc = run(i, shell=True, stdout=PIPE, stderr=PIPE)
             pre_cmd_out = proc.stdout.decode()
             pre_cmd_err = proc.stderr.decode()
+
+    def do_root_archive(self):
+        """Copy the workflow directory to the root archive location."""
+
+        if self.root_archive:
+            self.root_archive.execute(self.root_archive_excludes)
 
 
 class CommandGroup(Base):
@@ -1483,7 +1503,7 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
-    def archive(self, task_idx):
+    def do_archive(self, task_idx):
         """Archive the working directory associated with a given task in this
         command group submission."""
 
@@ -1504,7 +1524,7 @@ class CommandGroupSubmission(Base):
         dir_val = self.directories[dir_idx]
 
         exclude = self.command_group.archive_excludes
-        self.command_group.archive.execute(dir_val, exclude)
+        self.command_group.archive.execute_with_lock(dir_val, exclude)
 
 
 class VarValue(Base):

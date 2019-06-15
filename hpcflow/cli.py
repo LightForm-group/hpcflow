@@ -179,6 +179,17 @@ def archive(cmd_group_sub_id, task, directory=None):
 
 
 @cli.command()
+@click.option('--directory', '-d')
+@click.argument('--workflow-id', '-w', type=click.INT)
+def root_archive(workflow_id, directory=None):
+    print('hpcflow.cli.root_archive', flush=True)
+    api.root_archive(
+        workflow_id,
+        directory
+    )
+
+
+@cli.command()
 def stat():
     """Show the status of running tasks and the number completed tasks."""
     print('hpcflow.cli.stat')

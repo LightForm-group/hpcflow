@@ -26,6 +26,8 @@ PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
     'nesting',
     'scheduler_options',
     'pre_commands',
+    'root_archive',
+    'root_archive_excludes',
     'variable_scope',
     'variables',
 ]

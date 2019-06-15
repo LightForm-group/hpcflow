@@ -21,14 +21,47 @@ from hpcflow.variables import (
 )
 
 
+def resolve_root_archive(root_archive_name, archives):
+    """Resolve archive definition from the config file for the root archive.
+
+    Returns
+    -------
+    arch_idx : int
+        The index of the root archive in the archives list.
+
+    """
+
+    try:
+        arch_defn = CONFIG['archives'][root_archive_name]
+    except KeyError:
+        msg = ('An archive called "{}" was not found in the '
+               'configuration file. Available archives are: {}')
+        raise ValueError(msg.format(root_archive_name, CONFIG['archives']))
+
+    existing_idx = None
+    for k_idx, k in enumerate(archives):
+        if k['name'] == root_archive_name:
+            existing_idx = k_idx
+            break
+
+    if existing_idx is not None:
+        arch_idx = existing_idx
+    else:
+        archives.append({
+            'name': root_archive_name,
+            **arch_defn,
+        })
+        arch_idx = len(archives) - 1
+
+    return arch_idx
+
+
 def resolve_archives(cmd_group, archives):
     """Resolve archive definition from the config file and add to the archives
     list"""
 
     arch_name = cmd_group.pop('archive', None)
     if arch_name:
-        arch_exc = cmd_group.get('archive_excludes')
-
         try:
             arch_defn = CONFIG['archives'][arch_name]
         except KeyError:
@@ -96,9 +129,26 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     command_groups = []
     pre_commands = []
     archives = []
+    root_arch_name = None
+    root_arch_exc = []
+    root_arch_num = 0
     for i in all_profiles:
 
         pre_commands.extend(i.get('pre_commands') or [])
+
+        # `root_archive` should be specified at most once across all profiles
+        # regardless of whether the value is set to `null`:
+        if 'root_archive' in i:
+            if root_arch_num == 1:
+                msg = ('`root_archive` must be specified at most once across '
+                       'all job profiles.')
+                raise ValueError(msg)
+            else:
+                root_arch_num += 1
+                root_arch_name = i['root_archive']
+
+                if i.get('root_archive_excludes'):
+                    root_arch_exc.extend(i['root_archive_excludes'])
 
         profile_cmd_groups = []
         # Form command group list:
@@ -137,11 +187,17 @@ def parse_job_profiles(dir_path=None, profile_list=None):
 
             var_definitions.update(cmd_group_var_defns)
 
+    root_arch_idx = None
+    if root_arch_name:
+        root_arch_idx = resolve_root_archive(root_arch_name, archives)
+
     workflow = {
         'command_groups': command_groups,
         'var_definitions': var_definitions,
         'pre_commands': pre_commands,
         'archives': archives,
+        'root_archive_idx': root_arch_idx,
+        'root_archive_excludes': root_arch_exc
     }
 
     return workflow

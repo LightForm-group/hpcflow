@@ -201,7 +201,21 @@ def archive(cmd_group_sub_id, task, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.archive(task)
+    cg_sub.do_archive(task)
+
+    session.commit()
+    session.close()
+
+
+def root_archive(workflow_id, dir_path=None):
+    """Archive the root directory of the Workflow."""
+
+    project = Project(dir_path)
+    Session = init_db(project.db_uri, check_exists=True)
+    session = Session()
+
+    workflow = session.query(Workflow).get(workflow_id)
+    workflow.do_root_archive()
 
     session.commit()
     session.close()
