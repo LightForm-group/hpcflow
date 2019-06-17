@@ -1,4 +1,10 @@
-"""`hpcflow.archive.cloud.cloud.py"""
+"""`hpcflow.archive.cloud.cloud.py
+
+TODO: if we have multiple cloud providers, perhaps it would be better to
+implement the `upload_directory` function generally, and then just rely on 
+the provider-specific `upload_file` functions.
+
+"""
 
 import enum
 
