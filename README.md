@@ -1,5 +1,5 @@
 <div style="text-align:center">
-    <img src="logo.svg"/>
+    <img src="https://www.dropbox.com/s/snha33zkh4ganh7/logo.svg?dl=0"/>
 </div>
 
 # [WIP] hpcflow

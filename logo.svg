@@ -10,15 +10,27 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="62.173306mm"
+   width="57.945744mm"
    height="16.570711mm"
-   viewBox="0 0 62.173304 16.570711"
+   viewBox="0 0 57.945742 16.570711"
    version="1.1"
    id="svg8"
    inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
    sodipodi:docname="logo.svg">
   <defs
      id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient846">
+      <stop
+         style="stop-color:#333333;stop-opacity:1"
+         offset="0"
+         id="stop842" />
+      <stop
+         style="stop-color:#000000;stop-opacity:1"
+         offset="1"
+         id="stop844" />
+    </linearGradient>
     <linearGradient
        inkscape:collect="always"
        id="linearGradient857">
@@ -148,7 +160,17 @@
        y1="324.86719"
        x2="307.55273"
        y2="324.86719"
-       gradientTransform="matrix(0.26458333,0,0,0.26458333,207.28222,46.760094)" />
+       gradientTransform="matrix(0.13123333,0,0,0.13123333,220.94056,90.081137)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient846"
+       id="linearGradient848"
+       x1="209.80815"
+       y1="133.85194"
+       x2="226.49323"
+       y2="133.85194"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.92388095,0,0,0.92388095,15.970398,10.428421)" />
   </defs>
   <sodipodi:namedview
      id="base"
@@ -157,9 +179,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.979899"
-     inkscape:cx="86.532678"
-     inkscape:cy="-9.588422"
+     inkscape:zoom="4"
+     inkscape:cx="95.84829"
+     inkscape:cy="21.618478"
      inkscape:document-units="mm"
      inkscape:current-layer="g920"
      showgrid="false"
@@ -175,7 +197,23 @@
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:snap-global="true" />
+     inkscape:snap-global="true"
+     inkscape:snap-text-baseline="true"
+     inkscape:snap-center="true"
+     inkscape:snap-object-midpoints="true"
+     inkscape:snap-midpoints="true"
+     inkscape:snap-smooth-nodes="true">
+    <sodipodi:guide
+       position="29.048117,5.2948083"
+       orientation="0,-41.874973"
+       id="guide840"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="25.732893,13.867134"
+       orientation="0,22.633739"
+       id="guide852"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
   <metadata
      id="metadata5">
     <rdf:RDF>
@@ -184,7 +222,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -192,58 +230,52 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(-162.47403,-41.463418)">
+     transform="translate(-161.99034,-42.759743)">
     <g
        id="g906">
       <g
          id="g920"
          transform="translate(-40.821425,-82.965774)">
+        <rect
+           style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.80000001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:0.79999999, 0.79999999;stroke-dashoffset:0;stroke-opacity:1"
+           id="rect905"
+           width="57.945744"
+           height="16.570711"
+           x="202.81177"
+           y="125.72552" />
         <g
-           id="g923"
-           transform="matrix(0.49600001,0,0,0.49600001,118.12858,66.888131)"
-           style="stroke-width:2.01612902">
-          <rect
-             y="116.0102"
-             x="171.7074"
-             height="33.408691"
-             width="125.3494"
-             id="rect905"
-             style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1.61290324;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:1.61290318, 1.61290318;stroke-dashoffset:0;stroke-opacity:1" />
-          <g
-             transform="translate(-1.2525821e-6)"
-             id="g913"
-             style="stroke-width:2.01612902">
-            <text
-               xml:space="preserve"
-               style="font-style:normal;font-weight:normal;font-size:4.9609375px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:2.01612902px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-               x="177.80904"
-               y="139.06429"
-               id="text895"><tspan
-                 sodipodi:role="line"
-                 x="177.80904"
-                 y="139.06429"
-                 id="tspan893"
-                 style="stroke-width:2.01612902px"><tspan
-                   x="177.80904"
-                   y="139.06429"
-                   style="font-style:normal;font-variant:normal;font-weight:300;font-stretch:normal;font-size:26.45833206px;font-family:corbel;-inkscape-font-specification:'corbel Light';stroke-width:2.01612902px"
-                   id="tspan891">hpc</tspan></tspan></text>
-            <text
-               xml:space="preserve"
-               style="font-style:normal;font-weight:normal;font-size:4.9609375px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:url(#linearGradient903);fill-opacity:1;stroke:none;stroke-width:2.01612902px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-               x="220.41682"
-               y="141.35742"
-               id="text901"><tspan
-                 sodipodi:role="line"
-                 x="220.41682"
-                 y="141.35742"
-                 id="tspan899"
-                 style="fill:url(#linearGradient903);stroke-width:2.01612902px"><tspan
-                   x="220.41682"
-                   y="141.35742"
-                   style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.45833206px;font-family:Corbel;-inkscape-font-specification:Corbel;fill:url(#linearGradient903);fill-opacity:1;stroke-width:2.01612902px"
-                   id="tspan897">FLOW</tspan></tspan></text>
-          </g>
+           id="g850"
+           transform="translate(-3.7703125)">
+          <text
+             id="text895"
+             y="137.00142"
+             x="209.38191"
+             style="font-style:normal;font-weight:normal;font-size:2.27332449px;line-height:125%;font-family:sans-serif;letter-spacing:-1.22221744px;word-spacing:0px;fill:#4d4d4d;fill-opacity:1;stroke:none;stroke-width:0.99999994px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+             xml:space="preserve"><tspan
+               style="font-style:italic;font-variant:normal;font-weight:300;font-stretch:normal;font-family:corbel;-inkscape-font-specification:'corbel Light Italic';letter-spacing:-0.48888704px;fill:#4d4d4d;fill-opacity:1;stroke-width:0.99999994px"
+               id="tspan893"
+               y="137.00142"
+               x="209.38191"
+               sodipodi:role="line"><tspan
+                 id="tspan891"
+                 style="font-style:italic;font-variant:normal;font-weight:300;font-stretch:normal;font-size:12.12439728px;font-family:corbel;-inkscape-font-specification:'corbel Light Italic';letter-spacing:-0.48888704px;fill:#4d4d4d;fill-opacity:1;stroke-width:0.99999994px"
+                 y="137.00142"
+                 x="209.38191">hpc</tspan></tspan></text>
+          <text
+             id="text901"
+             y="137.00142"
+             x="227.45532"
+             style="font-style:normal;font-weight:normal;font-size:2.46062493px;line-height:125%;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:url(#linearGradient903);fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+             xml:space="preserve"><tspan
+               style="fill:url(#linearGradient903);stroke-width:1px"
+               id="tspan899"
+               y="137.00142"
+               x="227.45532"
+               sodipodi:role="line"><tspan
+                 id="tspan897"
+                 style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:13.12333298px;font-family:Corbel;-inkscape-font-specification:Corbel;fill:url(#linearGradient903);fill-opacity:1;stroke-width:1px"
+                 y="137.00142"
+                 x="227.45532">FLOW</tspan></tspan></text>
         </g>
       </g>
     </g>
