@@ -48,7 +48,8 @@ class Archive(Base):
 
     __tablename__ = 'archive'
     __table_args__ = (
-        UniqueConstraint('path', 'host', name='archive_location'),
+        UniqueConstraint('path', 'host', 'cloud_provider',
+                         name='archive_location'),
     )
 
     id_ = Column('id', Integer, primary_key=True)
