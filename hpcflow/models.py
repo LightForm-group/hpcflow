@@ -1461,10 +1461,14 @@ class CommandGroupSubmission(Base):
         ]
 
         delims = CONFIG['variable_delimiters']
-        lns_cmd = [
-            '\t' + i.replace(delims[0], '${').replace(delims[1], '}')
-            for i in self.command_group.commands
-        ]
+        lns_cmd = []
+        for i in self.command_group.commands:
+            cmd_ln = '\t'
+            is_parallel = 'pe' in self.command_group.scheduler_options
+            if is_parallel:
+                cmd_ln += 'mpirun -np $NSLOTS '
+            cmd_ln += i.replace(delims[0], '${').replace(delims[1], '}')
+            lns_cmd.append(cmd_ln)
 
         lns_while_end = [
             'done \\'
