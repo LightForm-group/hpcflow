@@ -119,7 +119,7 @@ class Workflow(Base):
 
         self._directory = str(directory)
         self.create_time = datetime.now()
-        self.pre_commands = pre_commands        
+        self.pre_commands = pre_commands
         self.variable_definitions = [
             VarDefinition(name=k, **v) for k, v in var_definitions.items()
         ]
@@ -161,7 +161,7 @@ class Workflow(Base):
 
         self.command_groups = cmd_groups
 
-        self.validate(archive_objs)        
+        self.validate(archive_objs)
         self._execute_pre_commands()
         self.do_root_archive()
 
