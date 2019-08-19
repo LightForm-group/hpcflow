@@ -46,10 +46,8 @@ class Workflow(Base):
         order_by='CommandGroup.exec_order',
     )
     submissions = relationship('Submission', back_populates='workflow')
-    variable_definitions = relationship('VarDefinition',
-                                        back_populates='workflow')
-    root_archive = relationship('Archive', back_populates='workflow',
-                                uselist=False)
+    variable_definitions = relationship('VarDefinition', back_populates='workflow')
+    root_archive = relationship('Archive', back_populates='workflow', uselist=False)
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
@@ -1016,8 +1014,7 @@ class CommandGroupSubmission(Base):
     command_group = relationship('CommandGroup',
                                  back_populates='command_group_submissions')
 
-    submission = relationship('Submission',
-                              back_populates='command_group_submissions')
+    submission = relationship('Submission', back_populates='command_group_submissions')
 
     command_group_exec_order = deferred(
         select([CommandGroup.exec_order]).where(
@@ -1065,9 +1062,7 @@ class CommandGroupSubmission(Base):
                         if val_dir_val.value in var_vals_dat_ii:
 
                             if i.name in var_vals_dat_ii[val_dir_val.value]:
-
-                                var_vals_dat_ii[val_dir_val.value][i.name].append(
-                                    j.value)
+                                var_vals_dat_ii[val_dir_val.value][i.name].append(j.value)
                             else:
                                 var_vals_dat_ii[val_dir_val.value].update(
                                     {i.name: [j.value]})
