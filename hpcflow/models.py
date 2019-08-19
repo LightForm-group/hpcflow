@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from hpcflow import CONFIG
 from hpcflow.archive.archive import Archive
 from hpcflow.base_db import Base
+from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
 from hpcflow.utils import coerce_same_length, zeropad
 from hpcflow.validation import validate_task_multiplicity
@@ -199,7 +200,7 @@ class Workflow(Base):
 
         # If using an Archive with a cloud provider, check access:
         for i in archive_objs:
-            if i.cloud_provider != 'null':
+            if i.cloud_provider != CloudProvider.null:
                 i.cloud_provider.check_access()
 
     def get_scheduler_groups(self, submission):

@@ -83,7 +83,7 @@ class Archive(Base):
         self.root_directory_increment = root_directory_increment
 
         if not self.check_exists(self.path):
-            raise ValueError('Archive path does not exist.')
+            raise ValueError('Archive path "{}" does not exist.'.format(self.path))
 
     @property
     def path(self):
@@ -92,7 +92,7 @@ class Archive(Base):
     def check_exists(self, directory):
         'Check if a given directory exists on the Archive.'
         if not self.host:
-            if self.cloud_provider:
+            if self.cloud_provider != CloudProvider.null:
                 exists = self.cloud_provider.check_exists(directory)
             else:
                 exists = directory.is_dir()
@@ -206,7 +206,7 @@ class Archive(Base):
 
         try:
 
-            if self.cloud_provider != 'null':
+            if self.cloud_provider != CloudProvider.null:
                 try:
                     self.cloud_provider.upload(src_dir, dst_dir, ignore)
                 except (CloudProviderError, CloudCredentialsError, ArchiveError) as err:
