@@ -38,6 +38,7 @@ class Workflow(Base):
     _directory = Column('directory', String(255))
     root_archive_id = Column(Integer, ForeignKey('archive.id'), nullable=True)
     root_archive_excludes = Column(JSON, nullable=True)
+    root_archive_directory = Column(String(255), nullable=True)
 
     command_groups = relationship(
         'CommandGroup',
@@ -117,18 +118,26 @@ class Workflow(Base):
                 }
             })
 
+        self._directory = str(directory)
+        self.create_time = datetime.now()
+        self.pre_commands = pre_commands        
         self.variable_definitions = [
             VarDefinition(name=k, **v) for k, v in var_definitions.items()
         ]
 
         # Generate Archive objects:
-        archive_objs = None
+        archive_objs = []
+        archive_dir_names = []
         if archives:
-            archive_objs = [Archive(**kwargs) for kwargs in archives]
+            for i in archives:
+                arch_i = Archive(**i)
+                archive_objs.append(arch_i)
+                archive_dir_names.append(arch_i.get_archive_dir(self))
 
         if root_archive_idx is not None:
             self.root_archive = archive_objs[root_archive_idx]
             self.root_archive_excludes = root_archive_excludes
+            self.root_archive_directory = archive_dir_names[root_archive_idx]
 
         cmd_groups = []
         for i in command_groups:
@@ -146,19 +155,15 @@ class Workflow(Base):
             arch_idx = i.pop('archive_idx', None)
             if arch_idx is not None:
                 i.update({
-                    'archive': archive_objs[arch_idx]
+                    'archive': archive_objs[arch_idx],
+                    'archive_directory': archive_dir_names[arch_idx],
                 })
             cmd_groups.append(CommandGroup(**i))
 
         self.command_groups = cmd_groups
-        self.create_time = datetime.now()
-        self.pre_commands = pre_commands
-        self._directory = str(directory)
 
-        self.validate(archive_objs)
-
+        self.validate(archive_objs)        
         self._execute_pre_commands()
-
         self.do_root_archive()
 
     def get_variable_definition_by_name(self, variable_name):
@@ -508,7 +513,8 @@ class Workflow(Base):
         """Copy the workflow directory to the root archive location."""
 
         if self.root_archive:
-            self.root_archive.execute(self.root_archive_excludes)
+            self.root_archive.execute(self.root_archive_excludes,
+                                      self.root_archive_directory)
 
 
 class CommandGroup(Base):
@@ -531,6 +537,7 @@ class CommandGroup(Base):
     profile_name = Column(String(255), nullable=True)
     profile_order = Column(Integer, nullable=True)
     archive_excludes = Column(JSON, nullable=True)
+    archive_directory = Column(String(255), nullable=True)
 
     archive = relationship('Archive', back_populates='command_groups')
     workflow = relationship('Workflow', back_populates='command_groups')
@@ -542,7 +549,8 @@ class CommandGroup(Base):
     def __init__(self, commands, directory_var, is_job_array=True,
                  exec_order=None, nesting=None, modules=None,
                  scheduler_options=None, profile_name=None,
-                 profile_order=None, archive=None, archive_excludes=None):
+                 profile_order=None, archive=None, archive_excludes=None,
+                 archive_directory=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -588,6 +596,8 @@ class CommandGroup(Base):
         archive_excludes : list of str
             List of glob patterns representing files that should be excluding
             when archiving this command group.
+        archive_directory : str or Path, optional
+            Name of the directory in which the archive for this command group will reside.
 
         TODO: document how `nesting` interacts with `is_job_array`.
 
@@ -607,6 +617,7 @@ class CommandGroup(Base):
 
         self.archive = archive
         self.archive_excludes = archive_excludes
+        self.archive_directory = archive_directory
 
         self.validate()
 
@@ -1528,7 +1539,8 @@ class CommandGroupSubmission(Base):
         dir_val = self.directories[dir_idx]
 
         exclude = self.command_group.archive_excludes
-        self.command_group.archive.execute_with_lock(dir_val, exclude)
+        self.command_group.archive.execute_with_lock(
+            dir_val, exclude, self.command_group.archive_directory)
 
 
 class VarValue(Base):

@@ -56,8 +56,8 @@ def is_folder(dbx, path):
     try:
         meta = dbx.files_get_metadata(path)
         return isinstance(meta, dropbox_api.files.FolderMetadata)
-    except dropbox_api.exceptions.ApiError as api_err:
-        raise ValueError('Path not found on Dropbox: {}'.format(path))
+    except dropbox_api.exceptions.ApiError:
+        return False
 
 
 def rename_file(dbx, src_path, dst_path):
@@ -71,6 +71,14 @@ def rename_file(dbx, src_path, dst_path):
 
 def download_dropbox_file(dbx, dropbox_path, local_path):
     dbx.files_download_to_file(local_path, dropbox_path)
+
+
+def normalise_path(path):
+    'Modify a path (str or Path) such that it is a Dropbox-compatible path string.'
+    path = posixpath.join(*str(path).split(os.path.sep))
+    if not path.startswith('/'):
+        path = '/' + path
+    return path
 
 
 def upload_dropbox_file(dbx, local_path, dropbox_path, overwrite=False,
@@ -164,9 +172,7 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
                 # Destination path
                 rel_path = os.path.relpath(src_fn, local_path)
                 fn_db_path = os.path.join(dropbox_path, rel_path)
-                dst_fn = posixpath.join(*fn_db_path.split(os.path.sep))
-                if not dst_fn.startswith('/'):
-                    dst_fn = '/' + dst_fn
+                dst_fn = normalise_path(fn_db_path)
 
                 print('Uploading file: {}'.format(file_name))
                 try:

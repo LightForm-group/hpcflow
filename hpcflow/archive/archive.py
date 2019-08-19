@@ -6,6 +6,7 @@ This module contains a database model class for the archiving capabilities.
 
 import shutil
 import enum
+import time
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
@@ -13,7 +14,7 @@ from shutil import ignore_patterns
 from time import sleep
 
 from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
-                        UniqueConstraint, Enum)
+                        UniqueConstraint, Enum, Boolean)
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -43,6 +44,13 @@ archive_is_active = Table(
 )
 
 
+class RootDirectoryName(enum.Enum):
+
+    parent = 'parent'
+    datetime = 'datetime'
+    null = ''
+
+
 class Archive(Base):
     """Class to represent an archive location."""
 
@@ -54,27 +62,78 @@ class Archive(Base):
 
     id_ = Column('id', Integer, primary_key=True)
     name = Column(String(255))
-    path = Column(String(255))
+    _path = Column('path', String(255))
     host = Column(String(255))
     cloud_provider = Column(Enum(CloudProvider))
+    root_directory_name = Column(Enum(RootDirectoryName))
+    root_directory_increment = Column(Boolean)
 
     command_groups = relationship('CommandGroup', back_populates='archive')
-    directories_archiving = relationship(
-        'VarValue',
-        secondary=archive_is_active
-    )
-    workflow = relationship('Workflow', back_populates='root_archive',
-                            uselist=False)
+    directories_archiving = relationship('VarValue', secondary=archive_is_active)
+    workflow = relationship('Workflow', back_populates='root_archive', uselist=False)
 
-    def __init__(self, name, path, host='', cloud_provider=''):
+    def __init__(self, name, path, host='', cloud_provider='', root_directory_name='',
+                 root_directory_increment=True):
 
         self.name = name
-        self.path = path
+        self._path = path
         self.host = host
         self.cloud_provider = CloudProvider(cloud_provider)
+        self.root_directory_name = RootDirectoryName(root_directory_name)
+        self.root_directory_increment = root_directory_increment
 
-    def execute(self, exclude):
-        """Execute the archive process with no lock.
+        if not self.check_exists(self.path):
+            raise ValueError('Archive path does not exist.')
+
+    @property
+    def path(self):
+        return Path(self._path)
+
+    def check_exists(self, directory):
+        'Check if a given directory exists on the Archive.'
+        if not self.host:
+            if self.cloud_provider:
+                exists = self.cloud_provider.check_exists(directory)
+            else:
+                exists = directory.is_dir()
+        else:
+            raise NotImplementedError()
+
+        return exists
+
+    def get_archive_dir(self, workflow):
+        'This should be called once per unique workflow Archive.'
+
+        if self.root_directory_name != RootDirectoryName.null:
+
+            if self.root_directory_name == RootDirectoryName.parent:
+                archive_dir = workflow.directory.stem
+            elif self.root_directory_name == RootDirectoryName.datetime:
+                archive_dir = time.strftime('%Y-%m-%d-%H%M')
+
+            if self.check_exists(self.path.joinpath(archive_dir)):
+
+                if self.root_directory_increment:
+                    count = 0
+                    max_count = 10
+                    while self.check_exists(self.path.joinpath(archive_dir)):
+                        count += 1
+                        if count > max_count:
+                            msg = ('Maximum iteration reached ({}) in searching for '
+                                   'available archive directory.'.format(max_count))
+                            raise RuntimeError(msg)
+                        archive_dir = archive_dir + '_1'
+                else:
+                    msg = ('Archive directory "{}" already exists.')
+                    raise ValueError(msg.format(archive_dir))
+
+        else:
+            archive_dir = ''
+
+        return archive_dir
+
+    def execute(self, exclude, archive_dir):
+        """Execute the archive process with no lock. Used for root archive.
 
         Parameters
         ----------
@@ -82,11 +141,9 @@ class Archive(Base):
 
         """
 
-        src_dir = self.workflow.directory
-        dst_dir = self.path
-        self._copy(src_dir, dst_dir, exclude)
+        self._copy(self.workflow.directory, self.path.joinpath(archive_dir), exclude)
 
-    def execute_with_lock(self, directory_value, exclude):
+    def execute_with_lock(self, directory_value, exclude, archive_dir):
         """Execute the archive process of a given working directory.
 
         Parameters
@@ -98,7 +155,7 @@ class Archive(Base):
 
         root_dir = self.command_groups[0].workflow.directory
         src_dir = root_dir.joinpath(directory_value.value)
-        dst_dir = Path(self.path).joinpath(directory_value.value)
+        dst_dir = self.path.joinpath(archive_dir, directory_value.value)
 
         session = Session.object_session(self)
 
@@ -152,8 +209,7 @@ class Archive(Base):
             if self.cloud_provider != 'null':
                 try:
                     self.cloud_provider.upload(src_dir, dst_dir, ignore)
-                except (CloudProviderError, CloudCredentialsError,
-                        ArchiveError) as err:
+                except (CloudProviderError, CloudCredentialsError, ArchiveError) as err:
                     raise ArchiveError(err)
             else:
                 if ignore:
@@ -161,8 +217,7 @@ class Archive(Base):
                 else:
                     ignore_func = None
                 try:
-                    copytree_multi(str(src_dir), str(
-                        dst_dir), ignore=ignore_func)
+                    copytree_multi(str(src_dir), str(dst_dir), ignore=ignore_func)
                 except shutil.Error as err:
                     raise ArchiveError(err)
 
