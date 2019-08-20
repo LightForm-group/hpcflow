@@ -1301,21 +1301,24 @@ class CommandGroupSubmission(Base):
             'ROOT_DIR=`pwd`',
             'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
             'INPUTS_DIR=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
-            'LOG_PATH=$SUBMIT_DIR/log_{}.$SGE_TASK_ID'.format(
-                cmd_group.exec_order)
+            'LOG_PATH=$SUBMIT_DIR/log_{}.$SGE_TASK_ID'.format(cmd_group.exec_order),
+            'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(task_step_size)
         ]
 
         write_cmd_exec = [
-            ('hpcflow write-cmd -d `pwd` {0:} > '
-             '$LOG_PATH 2>&1').format(self.id_),
+            ('hpcflow write-cmd -d $ROOT_DIR {0:} > $LOG_PATH 2>&1').format(self.id_),
         ]
 
-        loads = ['module load {}'.format(i)
-                 for i in sorted(cmd_group.modules)]
+        loads = ['module load {}'.format(i) for i in sorted(cmd_group.modules)]
 
+        set_task_args = '-d $ROOT_DIR -t $TASK_IDX {} >> $LOG_PATH 2>&1'.format(self.id_)
         cmd_exec = [
+            'hpcflow set-task-start {}'.format(set_task_args),
+            '',
             'cd $INPUTS_DIR',
-            '. $SUBMIT_DIR/{}'.format(cmd_fn)
+            '. $SUBMIT_DIR/{}'.format(cmd_fn),
+            '',
+            'hpcflow set-task-end {}'.format(set_task_args),
         ]
 
         arch_lns = []
@@ -1332,7 +1335,7 @@ class CommandGroupSubmission(Base):
                     define_dirs + [''] +
                     write_cmd_exec + [''] +
                     loads + [''] +
-                    cmd_exec + [''] +
+                    cmd_exec +
                     arch_lns)
 
         # Write jobscript:
@@ -1520,6 +1523,16 @@ class CommandGroupSubmission(Base):
         cmd_path = dir_path.joinpath(cmd_fn)
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
+
+    def set_task_start(self, task_idx):
+        context = 'CommandGroupSubmission.set_task_start'
+        msg = '{{}} {}: Task index {} started.'.format(context, task_idx)
+        print(msg.format(datetime.now()), flush=True)
+
+    def set_task_end(self, task_idx):
+        context = 'CommandGroupSubmission.set_task_start'
+        msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
+        print(msg.format(datetime.now()), flush=True)
 
     def do_archive(self, task_idx):
         """Archive the working directory associated with a given task in this
