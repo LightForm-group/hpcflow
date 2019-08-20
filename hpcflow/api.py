@@ -179,6 +179,32 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
     session.close()
 
 
+def set_task_start(cmd_group_sub_id, task_idx, dir_path=None):
+
+    project = Project(dir_path)
+    Session = init_db(project.db_uri, check_exists=True)
+    session = Session()
+
+    cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
+    cg_sub.set_task_start(task_idx)
+
+    session.commit()
+    session.close()
+
+
+def set_task_end(cmd_group_sub_id, task_idx, dir_path=None):
+
+    project = Project(dir_path)
+    Session = init_db(project.db_uri, check_exists=True)
+    session = Session()
+
+    cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
+    cg_sub.set_task_end(task_idx)
+
+    session.commit()
+    session.close()
+
+
 def archive(cmd_group_sub_id, task, dir_path=None):
     """Initiate an archive of a given task.
 

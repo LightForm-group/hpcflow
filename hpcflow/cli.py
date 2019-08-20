@@ -158,11 +158,25 @@ def make(directory=None, profiles=None, json_file=None, json=None):
 @click.argument('cmd_group_sub_id', type=click.INT)
 def write_cmd(cmd_group_sub_id, task=None, directory=None):
     print('hpcflow.cli.write_cmd', flush=True)
-    api.write_cmd(
-        cmd_group_sub_id,
-        task,
-        directory,
-    )
+    api.write_cmd(cmd_group_sub_id, task, directory)
+
+
+@cli.command()
+@click.option('--directory', '-d')
+@click.option('--task_idx', '-t', type=click.INT)
+@click.argument('cmd_group_sub_id', type=click.INT)
+def set_task_start(cmd_group_sub_id, task_idx, directory=None):
+    print('hpcflow.cli.set_task_start', flush=True)
+    api.set_task_start(cmd_group_sub_id, task_idx, directory)
+
+
+@cli.command()
+@click.option('--directory', '-d')
+@click.option('--task_idx', '-t', type=click.INT)
+@click.argument('cmd_group_sub_id', type=click.INT)
+def set_task_end(cmd_group_sub_id, task_idx, directory=None):
+    print('hpcflow.cli.set_task_end', flush=True)
+    api.set_task_end(cmd_group_sub_id, task_idx, directory)
 
 
 @cli.command()
