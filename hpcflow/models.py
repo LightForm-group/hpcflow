@@ -1129,7 +1129,7 @@ class CommandGroupSubmission(Base):
 
     @property
     def directory_values(self):
-        """Get the directories associated with this command group 
+        """Get the directories associated with this command group
         submission."""
 
         dir_vals = [i.value for i in self.directories]
@@ -1137,7 +1137,7 @@ class CommandGroupSubmission(Base):
 
     @property
     def directories(self):
-        """Get the directory variable values associated with this command group 
+        """Get the directory variable values associated with this command group
         submission.
 
         TODO: do we need to order these?
@@ -1199,13 +1199,13 @@ class CommandGroupSubmission(Base):
         TODO: problem here; if first command group in the scheduler group,
         not necessarily the first command group of the submission (so vars
         might not be resolved). For all comman groups, should try to see if
-        vars are resolved actually; checking the directory var should be 
+        vars are resolved actually; checking the directory var should be
         included. Try to get num var values by checking for resolved values
         and other things (expected multiplicity, etc).
 
         So I guess this function should not make any assumptions about
         whether var values are resolved or not; it should just try and see for
-        itself (and so it shouldn't matter which command group it is.) So I 
+        itself (and so it shouldn't matter which command group it is.) So I
         guess we can keep `num_inputs` to be None if it's the first cmd group
         in a scheduler group, because in all such cases, the number of outputs
         is unrelated to the number of inputs.
