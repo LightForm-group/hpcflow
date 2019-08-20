@@ -1347,18 +1347,22 @@ class CommandGroupSubmission(Base):
 
         session = Session.object_session(self)
 
+        sleep_time = 5
+        context = 'CommandGroupSubmission.write_cmd'
+        block_msg = ('{{}} {}: Writing command file blocked. Sleeping for {} '
+                     'seconds'.format(context, sleep_time))
+        unblock_msg = ('{{}} {}: Commands not written and writing available. Writing '
+                       'command file.'.format(context))
+
         if not self.commands_written:
 
-            sleep_time = 5
             blocked = True
             while blocked:
-
-                print('{} Writing command file blocked...'.format(
-                    datetime.now()), flush=True)
 
                 session.refresh(self)
 
                 if self.is_command_writing:
+                    print(block_msg.format(datetime.now()), flush=True)
                     sleep(sleep_time)
 
                 else:
@@ -1370,17 +1374,20 @@ class CommandGroupSubmission(Base):
                     except IntegrityError:
                         # Another process has already set `is_command_writing`
                         session.rollback()
+                        print(block_msg.format(datetime.now()), flush=True)
                         sleep(sleep_time)
 
                     except OperationalError:
                         # Database is likely locked.
                         session.rollback()
+                        print(block_msg.format(datetime.now()), flush=True)
                         sleep(sleep_time)
 
                     if not blocked:
 
                         if not self.commands_written:
 
+                            print(unblock_msg.format(datetime.now()), flush=True)
                             self._write_cmd(project)
                             self.commands_written = True
 

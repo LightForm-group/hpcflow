@@ -159,14 +159,20 @@ class Archive(Base):
 
         session = Session.object_session(self)
 
-        wait_time = 10
+        sleep_time = 10
+        context = 'Archive.execute_with_lock'
+        block_msg = ('{{}} {}: Archiving blocked. Sleeping for {} '
+                     'seconds'.format(context, sleep_time))
+        unblock_msg = ('{{}} {}: Archiving available. Archiving.'.format(context))
+
         blocked = True
         while blocked:
-            print('{} Archiving blocked...'.format(datetime.now()), flush=True)
+
             session.refresh(self)
 
             if directory_value in self.directories_archiving:
-                sleep(wait_time)
+                print(block_msg.format(datetime.now()), flush=True)
+                sleep(sleep_time)
             else:
                 try:
                     self.directories_archiving.append(directory_value)
@@ -176,14 +182,17 @@ class Archive(Base):
                 except IntegrityError:
                     # Another process has already set `directories_archiving`
                     session.rollback()
-                    sleep(wait_time)
+                    print(block_msg.format(datetime.now()), flush=True)
+                    sleep(sleep_time)
 
                 except OperationalError:
                     # Database is likely locked.
                     session.rollback()
-                    sleep(wait_time)
+                    print(block_msg.format(datetime.now()), flush=True)
+                    sleep(sleep_time)
 
                 if not blocked:
+                    print(unblock_msg.format(datetime.now()), flush=True)
                     self._copy(src_dir, dst_dir, exclude)
                     self.directories_archiving.remove(directory_value)
                     session.commit()
