@@ -163,7 +163,9 @@ class Archive(Base):
         context = 'Archive.execute_with_lock'
         block_msg = ('{{}} {}: Archiving blocked. Sleeping for {} '
                      'seconds'.format(context, sleep_time))
-        unblock_msg = ('{{}} {}: Archiving available. Archiving.'.format(context))
+        unblock_msg = ('{{}} {}: Archiving available. Archiving from source directory: '
+                       '"{}" to destination directory: "{}".'.format(
+                           context, src_dir, dst_dir))
 
         blocked = True
         while blocked:
