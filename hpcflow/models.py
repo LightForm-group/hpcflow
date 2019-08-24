@@ -838,6 +838,8 @@ class VarDefinition(Base):
             msg = ('Cannot resolve variable value with name: {}')
             raise UnresolvedVariableError(msg.format(self.name))
 
+        vals = sorted(vals)
+
         return vals
 
 
