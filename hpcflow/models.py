@@ -1693,7 +1693,7 @@ class Task(Base):
             'end_time={}'
             ')').format(
                 self.__class__.__name__,
-                self.task_number.name,
+                self.task_number,
                 self.command_group_submission_id,
                 self.start_time,
                 self.end_time,
