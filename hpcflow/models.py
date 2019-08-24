@@ -726,7 +726,10 @@ class VarDefinition(Base):
 
     workflow = relationship('Workflow', back_populates='variable_definitions')
     variable_values = relationship(
-        'VarValue', back_populates='variable_definition')
+        'VarValue',
+        back_populates='variable_definition',
+        order_by='VarValue.order_id',
+    )
 
     def __init__(self, name, data=None, file_regex=None, value=None):
 
