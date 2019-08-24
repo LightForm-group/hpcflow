@@ -927,9 +927,8 @@ class Submission(Base):
 
                 # Add VarVals:
                 for val_idx, val in enumerate(dir_var_vals_dat):
-                    cg_dirs_var_vals.append(
-                        VarValue(val, val_idx, dir_var, self)
-                    )
+                    cg_dirs_var_vals.append(VarValue(val, val_idx, dir_var, self))
+                    
             else:
                 cg_dirs_var_vals = dir_var.variable_values
 
@@ -937,8 +936,7 @@ class Submission(Base):
 
             for j in cg_dirs_var_vals:
 
-                var_vals_dat = resolve_variable_values(
-                    var_defns_rec, Path(j.value))
+                var_vals_dat = resolve_variable_values(var_defns_rec, Path(j.value))
 
                 for k, v in var_vals_dat.items():
 
@@ -947,8 +945,7 @@ class Submission(Base):
 
                     if not self.is_variable_resolved(var_defn, j):
                         for val_idx, val in enumerate(vals_dat):
-                            VarValue(val, val_idx, var_defn,
-                                     self, directory_value=j)
+                            VarValue(val, val_idx, var_defn, self, directory_value=j)
                             session.commit()
 
     def write_submit_dirs(self, workflow_id, hf_dir, scheduler_groups):
