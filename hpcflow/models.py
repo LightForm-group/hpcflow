@@ -270,7 +270,7 @@ class Workflow(Base):
 
                 scheduler_groups['command_groups'][cg_idx].update({
                     'task_step_size': int(max_num_out / num_outs),
-                    'max_num_tasks': max_num_out,
+                    'num_tasks': num_outs,
                 })
 
         return scheduler_groups
@@ -371,10 +371,16 @@ class Workflow(Base):
         # Write a jobscript for each command group submission:
         js_paths = []
         for idx, i in enumerate(cmd_group_subs):
+
             js_kwargs = sch_groups['command_groups'][idx]
+            sch_group_idx = js_kwargs['scheduler_group_idx']
+
+            num_tasks = js_kwargs.pop('num_tasks')
+            for task_num in range(num_tasks):
+                Task(i, task_num)
+
             js_kwargs.update({
-                'max_num_tasks': sch_groups['max_num_tasks'][
-                    js_kwargs['scheduler_group_idx']]
+                'max_num_tasks': sch_groups['max_num_tasks'][sch_group_idx]
             })
             js_paths.append(i.write_jobscript(**js_kwargs, dir_path=submit_dir))
 
@@ -1025,6 +1031,8 @@ class CommandGroupSubmission(Base):
         cascade='all, delete, delete-orphan'
     )
 
+    tasks = relationship('Task', back_populates='command_group_submission')
+
     @property
     def variable_values(self):
 
@@ -1421,10 +1429,10 @@ class CommandGroupSubmission(Base):
         sch_group_dir = sub_dir.joinpath(
             'scheduler_group_{}'.format(sch_group_idx))
 
-        self.write_variable_files(var_vals, task_step_size, sch_group_dir)
+        self.write_variable_files(var_vals, task_step_size, sch_group_dir, num_tasks)
         self.write_cmd_file(sch_group_idx, sub_dir, num_tasks)
 
-    def write_variable_files(self, var_vals, task_step_size, sch_group_dir):
+    def write_variable_files(self, var_vals, task_step_size, sch_group_dir, num_tasks):
 
         task_multi = self.get_task_multiplicity()
         var_group_len = 1 if self.command_group.is_job_array else task_multi
@@ -1453,10 +1461,9 @@ class CommandGroupSubmission(Base):
 
             task_idx += task_step_size
 
-        max_tasks = len(var_vals_file_dat)
         for task_idx, var_vals_file in var_vals_file_dat.items():
 
-            vals_dir_num = zeropad(task_idx + 1, max_tasks + 1)
+            vals_dir_num = zeropad(task_idx + 1, num_tasks)
             var_vals_dir = sch_group_dir.joinpath('var_values', vals_dir_num)
 
             for var_name, var_val_all in var_vals_file.items():
@@ -1489,7 +1496,7 @@ class CommandGroupSubmission(Base):
         ]
 
         lns_task_id_pad = [
-            'MAX_NUM_TASKS={}'.format(num_tasks + 1),
+            'MAX_NUM_TASKS={}'.format(num_tasks),
             'MAX_NUM_DIGITS="${#MAX_NUM_TASKS}"',
             'ZEROPAD_TASK_ID=$(printf "%0${MAX_NUM_DIGITS}d" $SGE_TASK_ID)',
         ]
@@ -1527,15 +1534,32 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
+    def get_task(self, task_idx):
+        session = Session.object_session(self)
+        task = session.query(Task).filter_by(
+            command_group_submission_id=self.id_,
+            task_number=task_idx,
+        ).one()
+        return task
+
     def set_task_start(self, task_idx):
         context = 'CommandGroupSubmission.set_task_start'
         msg = '{{}} {}: Task index {} started.'.format(context, task_idx)
-        print(msg.format(datetime.now()), flush=True)
+        start_time = datetime.now()
+        print(msg.format(start_time), flush=True)
+        task = self.get_task(task_idx)
+        task.start_time = start_time
+        print('task: {}'.format(task))
+
 
     def set_task_end(self, task_idx):
         context = 'CommandGroupSubmission.set_task_start'
         msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
-        print(msg.format(datetime.now()), flush=True)
+        end_time = datetime.now()
+        print(msg.format(end_time), flush=True)
+        task = self.get_task(task_idx)
+        task.end_time = end_time
+        print('task: {}'.format(task))        
 
     def do_archive(self, task_idx):
         """Archive the working directory associated with a given task in this
@@ -1604,3 +1628,48 @@ class IsCommandWriting(Base):
         primary_key=True,
         unique=True
     )
+
+
+class Task(Base):
+    'Class to represent a single task.'
+
+    __tablename__ = 'task'
+
+    id_ = Column('id', Integer, primary_key=True)
+    task_number = Column(Integer, nullable=False)
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    memory = Column(Float)
+    hostname = Column(String(255))
+
+    command_group_submission_id = Column(
+        Integer, ForeignKey('command_group_submission.id'))
+
+    command_group_submission = relationship(
+        'CommandGroupSubmission', back_populates='tasks', uselist=False)
+
+    def __init__(self, command_group_submission, task_number):
+        self.task_number = task_number
+        self.command_group_submission = command_group_submission
+        self.start_time = None
+        self.end_time = None
+
+    def __repr__(self):
+        out = (
+            '{}('
+            'task_number={}, '
+            'command_group_submission_id={}, '
+            'start_time={}, '
+            'end_time={}'
+            ')').format(
+                self.__class__.__name__,
+                self.task_number.name,
+                self.command_group_submission_id,
+                self.start_time,
+                self.end_time,
+            )
+        return out
+
+    @property
+    def task_duration(self):
+        return self.end_time - self.start_time
