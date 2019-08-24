@@ -1616,6 +1616,20 @@ class VarValue(Base):
         self.submission = submission
         self.directory_value = directory_value
 
+    def __repr__(self):
+        out = (
+            '{}('
+            'variable_name={}, '
+            'value={}, '
+            'order_id={}'
+            ')').format(
+                self.__class__.__name__,
+                self.variable_definition.name,
+                self.value,
+                self.order_id,
+            )
+        return out
+
 
 class IsCommandWriting(Base):
     """Class to represent active writing of a command file."""
