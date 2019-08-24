@@ -11,7 +11,7 @@ from subprocess import run, PIPE
 from time import sleep
 
 from sqlalchemy import (Column, Integer, DateTime, JSON, ForeignKey, Boolean,
-                        Enum, String, select)
+                        Enum, String, select, Float)
 from sqlalchemy.orm import relationship, deferred, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
