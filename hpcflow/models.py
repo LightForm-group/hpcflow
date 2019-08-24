@@ -996,7 +996,7 @@ class Submission(Base):
             var_values_path.mkdir()
 
             for j in range(max_tasks_i):
-                j_fmt = zeropad(j + 1, max_tasks_i + 1)
+                j_fmt = zeropad(j + 1, max_tasks_i)
                 vv_j_path = var_values_path.joinpath(j_fmt)
                 vv_j_path.mkdir()
 
