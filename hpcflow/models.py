@@ -1617,11 +1617,9 @@ class VarValue(Base):
     submission_id = Column(Integer, ForeignKey('submission.id'))
     value = Column(String(255))
     order_id = Column(Integer)
-    directory_value_id = Column('directory_value_id', Integer,
-                                ForeignKey('var_value.id'))
+    directory_value_id = Column('directory_value_id', Integer, ForeignKey('var_value.id'))
 
-    variable_definition = relationship(
-        'VarDefinition', back_populates='variable_values')
+    variable_definition = relationship('VarDefinition', back_populates='variable_values')
     submission = relationship('Submission', back_populates='variable_values')
     directory_value = relationship('VarValue', uselist=False, remote_side=id_)
 
