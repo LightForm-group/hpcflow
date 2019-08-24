@@ -939,7 +939,7 @@ class Submission(Base):
                 # Add VarVals:
                 for val_idx, val in enumerate(dir_var_vals_dat):
                     cg_dirs_var_vals.append(VarValue(val, val_idx, dir_var, self))
-                    
+
             else:
                 cg_dirs_var_vals = dir_var.variable_values
 
@@ -1155,7 +1155,7 @@ class CommandGroupSubmission(Base):
 
         """
 
-        dir_vars_all = self.command_group.directory_variable.variable_values
+        dir_vars_all = self.command_group.directory_variable.variable_values        
         # Get only those with correct submission
         dirs = []
         for i in dir_vars_all:
