@@ -270,6 +270,7 @@ class Workflow(Base):
 
                 scheduler_groups['command_groups'][cg_idx].update({
                     'task_step_size': int(max_num_out / num_outs),
+                    'max_num_tasks': max_num_out,
                 })
 
         return scheduler_groups
@@ -362,8 +363,8 @@ class Workflow(Base):
 
         sch_groups = self.get_scheduler_groups(sub)
 
-        submit_dir = sub.write_submit_dirs(
-            self.id_, project.hf_dir, sch_groups)
+        print('sch_groups:')
+        pprint(sch_groups)
 
         submit_dir = sub.write_submit_dirs(self.id_, project.hf_dir, sch_groups)
 
@@ -1413,6 +1414,7 @@ class CommandGroupSubmission(Base):
         sch_group_cmd_group = sch_groups['command_groups'][self.command_group_exec_order]
         sch_group_idx = sch_group_cmd_group['scheduler_group_idx']
         task_step_size = sch_group_cmd_group['task_step_size']
+        num_tasks = sch_groups['max_num_tasks'][sch_group_idx]
 
         sub_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(sub.workflow.id_),
@@ -1423,7 +1425,7 @@ class CommandGroupSubmission(Base):
             'scheduler_group_{}'.format(sch_group_idx))
 
         self.write_variable_files(var_vals, task_step_size, sch_group_dir)
-        self.write_cmd_file(sch_group_idx, sub_dir)
+        self.write_cmd_file(sch_group_idx, sub_dir, num_tasks)
 
     def write_variable_files(self, var_vals, task_step_size, sch_group_dir):
 
@@ -1454,22 +1456,21 @@ class CommandGroupSubmission(Base):
 
             task_idx += task_step_size
 
+        max_tasks = len(var_vals_file_dat)
         for task_idx, var_vals_file in var_vals_file_dat.items():
 
-            var_vals_dir = sch_group_dir.joinpath(
-                'var_values', str(task_idx + 1))
+            vals_dir_num = zeropad(task_idx + 1, max_tasks + 1)
+            var_vals_dir = sch_group_dir.joinpath('var_values', vals_dir_num)
 
             for var_name, var_val_all in var_vals_file.items():
-
-                var_fn = 'var_{}{}'.format(
-                    var_name, CONFIG['variable_file_ext'])
+                var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
                 var_file_path = var_vals_dir.joinpath(var_fn)
 
                 with var_file_path.open('w') as handle:
                     for i in var_val_all:
                         handle.write('{}\n'.format(i))
 
-    def write_cmd_file(self, scheduler_group_idx, dir_path):
+    def write_cmd_file(self, scheduler_group_idx, dir_path, num_tasks):
 
         lns_while_start = [
             'while true',
@@ -1490,6 +1491,12 @@ class CommandGroupSubmission(Base):
             'done \\'
         ]
 
+        lns_task_id_pad = [
+            'MAX_NUM_TASKS={}'.format(num_tasks + 1),
+            'MAX_NUM_DIGITS="${#MAX_NUM_TASKS}"',
+            'ZEROPAD_TASK_ID=$(printf "%0${MAX_NUM_DIGITS}d" $SGE_TASK_ID)',
+        ]
+
         lns_read = []
         lns_fds = []
 
@@ -1499,8 +1506,7 @@ class CommandGroupSubmission(Base):
 
             var_fn = 'var_{}{}'.format(i.name, CONFIG['variable_file_ext'])
             var_file_path = ('$SUBMIT_DIR/scheduler_group_{}/var_values'
-                             '/$SGE_TASK_ID/{}').format(
-                scheduler_group_idx, var_fn)
+                             '/$ZEROPAD_TASK_ID/{}').format(scheduler_group_idx, var_fn)
 
             lns_read.append('\tread -u{} {} || break'.format(fd_idx, i.name))
 
@@ -1509,7 +1515,8 @@ class CommandGroupSubmission(Base):
 
             lns_fds.append('\t{}< {}'.format(fd_idx, var_file_path))
 
-        cmd_lns = (lns_while_start + [''] +
+        cmd_lns = (lns_task_id_pad + [''] +
+                   lns_while_start + [''] +
                    lns_read + [''] +
                    lns_cmd + [''] +
                    lns_while_end +
