@@ -365,6 +365,8 @@ class Workflow(Base):
         submit_dir = sub.write_submit_dirs(
             self.id_, project.hf_dir, sch_groups)
 
+        submit_dir = sub.write_submit_dirs(self.id_, project.hf_dir, sch_groups)
+
         # Write a jobscript for each command group submission:
         js_paths = []
         for idx, i in enumerate(cmd_group_subs):
@@ -373,9 +375,7 @@ class Workflow(Base):
                 'max_num_tasks': sch_groups['max_num_tasks'][
                     js_kwargs['scheduler_group_idx']]
             })
-            js_paths.append(
-                i.write_jobscript(**js_kwargs, dir_path=submit_dir)
-            )
+            js_paths.append(i.write_jobscript(**js_kwargs, dir_path=submit_dir))
 
         last_submit_id = None
 
@@ -1410,8 +1410,7 @@ class CommandGroupSubmission(Base):
         var_vals = self.get_variable_values_normed()
 
         sch_groups = sub.workflow.get_scheduler_groups(sub)
-        sch_group_cmd_group = sch_groups['command_groups'][
-            self.command_group_exec_order]
+        sch_group_cmd_group = sch_groups['command_groups'][self.command_group_exec_order]
         sch_group_idx = sch_group_cmd_group['scheduler_group_idx']
         task_step_size = sch_group_cmd_group['task_step_size']
 
