@@ -1311,8 +1311,20 @@ class CommandGroupSubmission(Base):
             'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(task_step_size)
         ]
 
+        log_stuff = [
+            r'touch $LOG_PATH',
+            r'printf "Jobscript variables:\n" >> $LOG_PATH 2>&1',
+            r'printf "ROOT_DIR:\t ${ROOT_DIR}\n" >> $LOG_PATH 2>&1',
+            r'printf "SUBMIT_DIR:\t ${SUBMIT_DIR}\n" >> $LOG_PATH 2>&1',
+            r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
+            r'printf "LOG_PATH:\t ${LOG_PATH}\n" >> $LOG_PATH 2>&1',
+            r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',            
+            r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
+            r'printf "\n" >> $LOG_PATH 2>&1',
+        ]
+
         write_cmd_exec = [
-            ('hpcflow write-cmd -d $ROOT_DIR {0:} > $LOG_PATH 2>&1').format(self.id_),
+            ('hpcflow write-cmd -d $ROOT_DIR {0:} >> $LOG_PATH 2>&1').format(self.id_),
         ]
 
         loads = ['module load {}'.format(i) for i in sorted(cmd_group.modules)]
@@ -1339,6 +1351,7 @@ class CommandGroupSubmission(Base):
                     sge_opts + [''] +
                     arr_opts + [''] +
                     define_dirs + [''] +
+                    log_stuff + [''] +
                     write_cmd_exec + [''] +
                     loads + [''] +
                     cmd_exec +
