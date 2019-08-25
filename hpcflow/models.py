@@ -1769,6 +1769,18 @@ class Task(Base):
 
         return scheduler_id
 
+    @property
+    def working_directory(self):
+        'Get the "working directory" of this task.'
+        dir_vals = self.command_group_submission.directory_values
+        sch_group_info = self.command_group_submission.get_scheduler_group_info()
+        dirs_per_task = len(dir_vals) / sch_group_info['num_tasks']
+        dir_idx = floor(self.order_id * dirs_per_task)
+        working_dir = dir_vals[dir_idx]
+        
+        return working_dir
+
+
     def get_stats(self, jsonable=True):
         'Get statistics for this task.'
         out = {
@@ -1780,6 +1792,7 @@ class Task(Base):
             'duration': self.duration,
             'memory': self.memory,
             'hostname': self.hostname,
+            'working_directory': self.working_directory,
         }
 
         if jsonable:
