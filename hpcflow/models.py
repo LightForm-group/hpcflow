@@ -1571,7 +1571,7 @@ class CommandGroupSubmission(Base):
 
 
     def set_task_end(self, task_idx):
-        context = 'CommandGroupSubmission.set_task_start'
+        context = 'CommandGroupSubmission.set_task_end'
         msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
         end_time = datetime.now()
         print(msg.format(end_time), flush=True)
@@ -1594,9 +1594,7 @@ class CommandGroupSubmission(Base):
         max_num_tasks = scheduler_groups['max_num_tasks'][
             sch_group['scheduler_group_idx']]
 
-        dir_idx = floor(
-            ((task_idx - 1) / max_num_tasks) * len(self.directories))
-
+        dir_idx = floor(((task_idx - 1) / max_num_tasks) * len(self.directories))
         dir_val = self.directories[dir_idx]
 
         exclude = self.command_group.archive_excludes
