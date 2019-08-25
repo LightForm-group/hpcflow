@@ -1721,7 +1721,7 @@ class Task(Base):
         return out
 
     @property
-    def task_duration(self):
+    def duration(self):
         if self.start_time and self.end_time:
             return self.end_time - self.start_time
         else:
@@ -1734,14 +1734,14 @@ class Task(Base):
             'task_number': self.task_number,
             'start_time': self.start_time,
             'end_time': self.end_time,
-            'duration': self.task_duration,
+            'duration': self.duration,
             'memory': self.memory,
             'hostname': self.hostname,
         }
 
         if jsonable:
         
-            if self.task_duration:
+            if self.duration:
                 # Format `datetime` and `timedelta` objects as strings:
                 days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
                 hours, hours_rem = divmod(days_rem, 3600)
