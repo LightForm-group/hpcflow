@@ -1573,7 +1573,7 @@ class CommandGroupSubmission(Base):
         session = Session.object_session(self)
         task = session.query(Task).filter_by(
             command_group_submission_id=self.id_,
-            task_number=task_idx,
+            order_id=task_idx,
         ).one()
         return task
 
@@ -1686,7 +1686,7 @@ class Task(Base):
     __tablename__ = 'task'
 
     id_ = Column('id', Integer, primary_key=True)
-    task_number = Column(Integer, nullable=False)
+    order_id = Column(Integer, nullable=False)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     memory = Column(Float)
@@ -1698,8 +1698,8 @@ class Task(Base):
     command_group_submission = relationship(
         'CommandGroupSubmission', back_populates='tasks', uselist=False)
 
-    def __init__(self, command_group_submission, task_number):
-        self.task_number = task_number
+    def __init__(self, command_group_submission, order_id):
+        self.order_id = order_id
         self.command_group_submission = command_group_submission
         self.start_time = None
         self.end_time = None
@@ -1707,13 +1707,13 @@ class Task(Base):
     def __repr__(self):
         out = (
             '{}('
-            'task_number={}, '
+            'order_id={}, '
             'command_group_submission_id={}, '
             'start_time={}, '
             'end_time={}'
             ')').format(
                 self.__class__.__name__,
-                self.task_number,
+                self.order_id,
                 self.command_group_submission_id,
                 self.start_time,
                 self.end_time,
@@ -1727,11 +1727,17 @@ class Task(Base):
         else:
             return None
 
+    @property
+    def scheduler_id(self):
+        'Get the task ID, as understood by the scheduler.'
+        return None
+
     def get_stats(self, jsonable=True):
         'Get statistics for this task.'
         out = {
             'task_id': self.id_,
-            'task_number': self.task_number,
+            'order_id': self.order_id,
+            'scheduler_id': self.scheduler_id,
             'start_time': self.start_time,
             'end_time': self.end_time,
             'duration': self.duration,
