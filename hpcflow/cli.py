@@ -213,7 +213,8 @@ def stat():
 @click.option('--directory', '-d')
 @click.option('--workflow-id', '-w', type=click.INT)
 def show_stats(directory=None, workflow_id=None):
-    'Show task statistics.'
+    'Show task statistics, formatted as a table.'
+    print(api.get_formatted_stats(directory, workflow_id))
 
 
 @cli.command()
