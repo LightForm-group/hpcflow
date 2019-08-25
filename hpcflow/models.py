@@ -522,6 +522,14 @@ class Workflow(Base):
             self.root_archive.execute(self.root_archive_excludes,
                                       self.root_archive_directory)
 
+    def get_stats(self, jsonable=True):
+        'Get task statistics for this workflow.'
+        out = {
+            'workflow_id': self.id_,
+            'submissions': [i.get_stats(jsonable=jsonable) for i in self.submissions]
+        }
+        return out
+
 
 class CommandGroup(Base):
     """Class to represent a command group, which is roughly translated into a
@@ -1006,6 +1014,15 @@ class Submission(Base):
                 vv_j_path.mkdir()
 
         return submit_path
+
+    def get_stats(self, jsonable=True):
+        'Get task statistics for this submission.'
+        out = {
+            'submission_id': self.id_,
+            'command_group_submissions': [i.get_stats(jsonable=jsonable)
+                                          for i in self.command_group_submissions]
+        }
+        return out
 
 
 class CommandGroupSubmission(Base):
@@ -1600,6 +1617,16 @@ class CommandGroupSubmission(Base):
         self.command_group.archive.execute_with_lock(
             dir_val, exclude, self.command_group.archive_directory)
 
+    def get_stats(self, jsonable=True):
+        'Get task statistics for this command group submission.'
+        out = {
+            'command_group_submission_id': self.id_,
+            'command_group_id': self.command_group.id_,
+            'commands': self.command_group.commands,
+            'tasks': [i.get_stats(jsonable=jsonable) for i in self.tasks]
+        }
+        return out
+
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""
@@ -1700,3 +1727,32 @@ class Task(Base):
     @property
     def task_duration(self):
         return self.end_time - self.start_time
+
+    def get_stats(self, jsonable=True):
+        'Get statistics for this task.'
+        out = {
+            'task_number': self.task_number,
+            'start_time': self.start_time,
+            'end_time': self.end_time,
+            'duration': self.task_duration,
+            'memory': self.memory,
+            'hostname': self.hostname,
+        }
+
+        if jsonable:
+            # Format `datetime` and `timedelta` objects as strings:
+            days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
+            hours, hours_rem = divmod(days_rem, 3600)
+            minutes, seconds = divmod(hours_rem, 60)
+
+            time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, minutes, seconds)
+            if days > 0:
+                days_str = 'day' if days == 1 else 'days'                
+                time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
+
+            fmt = r'%Y.%m.%d %H:%M:%S'
+            out['start_time'] = out['start_time'].strftime(fmt)
+            out['end_time'] = out['end_time'].strftime(fmt)
+            out['duration'] = time_diff_fmt
+
+        return out

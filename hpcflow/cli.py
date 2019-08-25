@@ -212,6 +212,22 @@ def stat():
 @cli.command()
 @click.option('--directory', '-d')
 @click.option('--workflow-id', '-w')
+def show_stats(directory=None, workflow_id=None):
+    'Show task statistics.'
+
+
+@cli.command()
+@click.option('--directory', '-d')
+@click.option('--workflow-id', '-w')
+@click.argument('save_path', type=click.Path(exists=False, dir_okay=False))
+def save_stats(save_path, directory=None, workflow_id=None):
+    'Save task statistics as a JSON file.'
+    api.save_stats(save_path, directory, workflow_id)
+
+
+@cli.command()
+@click.option('--directory', '-d')
+@click.option('--workflow-id', '-w')
 @click.option('--json-file')
 @click.option('--json')
 @click.option('--task-ranges', '-t',

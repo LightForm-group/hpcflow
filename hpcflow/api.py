@@ -245,3 +245,46 @@ def root_archive(workflow_id, dir_path=None):
 
     session.commit()
     session.close()
+
+
+def get_stats(dir_path=None, workflow_id=None, jsonable=True):
+    'Get task statistics (as a JSON-like dict) for a project.'
+
+    project = Project(dir_path)
+    Session = init_db(project.db_uri, check_exists=True)
+    session = Session()
+
+    all_workflow_ids = [i.id_ for i in session.query(Workflow.id_)]
+
+    if not all_workflow_ids:
+        msg = 'No workflows exist in directory: "{}"'
+        raise ValueError(msg.format(project.dir_path))
+
+    elif workflow_id:
+
+        if workflow_id not in all_workflow_ids:
+            msg = 'No workflow with ID "{}" was found in directory: "{}"'
+            raise ValueError(msg.format(workflow_id, project.dir_path))
+
+        workflow_ids = [workflow_id]
+
+    else:
+        workflow_ids = all_workflow_ids
+
+    workflows = [session.query(Workflow).get(i) for i in workflow_ids]
+    stats = [i.get_stats(jsonable=jsonable) for i in workflows]
+
+    session.close()
+
+    return stats
+
+
+def save_stats(save_path, dir_path=None, workflow_id=None):
+    'Save task statistics as a JSON file.'
+
+    stats = get_stats(dir_path, workflow_id, jsonable=True)
+    pprint(stats)
+
+    save_path = Path(save_path)
+    with save_path.open('w') as handle:
+        json.dump(stats, handle, indent=4, sort_keys=True)
