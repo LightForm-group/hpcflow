@@ -1739,20 +1739,22 @@ class Task(Base):
             'hostname': self.hostname,
         }
 
-        if jsonable and self.task_duration:
-            # Format `datetime` and `timedelta` objects as strings:
-            days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
-            hours, hours_rem = divmod(days_rem, 3600)
-            minutes, seconds = divmod(hours_rem, 60)
+        if jsonable:
+        
+            if self.task_duration:
+                # Format `datetime` and `timedelta` objects as strings:
+                days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
+                hours, hours_rem = divmod(days_rem, 3600)
+                mins, seconds = divmod(hours_rem, 60)
 
-            time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, minutes, seconds)
-            if days > 0:
-                days_str = 'day' if days == 1 else 'days'
-                time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
+                time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, mins, seconds)
+                if days > 0:
+                    days_str = 'day' if days == 1 else 'days'
+                    time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
+                out['duration'] = time_diff_fmt
 
             fmt = r'%Y.%m.%d %H:%M:%S'
             out['start_time'] = out['start_time'].strftime(fmt)
-            out['end_time'] = out['end_time'].strftime(fmt)
-            out['duration'] = time_diff_fmt
+            out['end_time'] = out['end_time'].strftime(fmt)            
 
         return out
