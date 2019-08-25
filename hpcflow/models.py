@@ -1750,7 +1750,7 @@ class Task(Base):
         }
 
         if jsonable:
-        
+
             if self.duration:
                 # Format `datetime` and `timedelta` objects as strings:
                 days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
@@ -1764,7 +1764,11 @@ class Task(Base):
                 out['duration'] = time_diff_fmt
 
             fmt = r'%Y.%m.%d %H:%M:%S'
-            out['start_time'] = out['start_time'].strftime(fmt)
-            out['end_time'] = out['end_time'].strftime(fmt)            
+
+            if self.start_time:
+                out['start_time'] = out['start_time'].strftime(fmt)
+
+            if self.end_time:
+                out['end_time'] = out['end_time'].strftime(fmt)
 
         return out
