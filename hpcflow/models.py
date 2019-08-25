@@ -408,13 +408,13 @@ class Workflow(Base):
             qsub_out = proc.stdout.decode()
             qsub_err = proc.stderr.decode()
 
-            print('qsub_out: {}'.format(qsub_out))
+            print(qsub_out)
 
             # Extract newly submitted job ID:
             pat = r'[0-9]+'
             job_id_search = re.search(pat, qsub_out)
             try:
-                job_id_str = job_id_search.group()
+                job_id_str = job_id_search.group()                
 
             except AttributeError:
                 msg = ('Could not retrieve the job ID from the submitted '
@@ -422,6 +422,7 @@ class Workflow(Base):
                        'submitted.')
                 raise ValueError(msg.format(js_path))
 
+            cg_sub.scheduler_job_id = int(job_id_str)
             last_submit_id = job_id_str
 
         return sub
@@ -1037,6 +1038,7 @@ class CommandGroupSubmission(Base):
     task_stop = Column(Integer)
     task_step = Column(Integer)
     commands_written = Column(Boolean)
+    scheduler_job_id = Column(Integer, nullable=True)
 
     command_group = relationship('CommandGroup',
                                  back_populates='command_group_submissions')
