@@ -75,5 +75,6 @@ setup(
         hfsub={0}.cli:submit
         hfmake={0}.cli:make
         hfstat={0}.cli:stat
+        hfkill={0}.cli.kill
     """.format(package_name)
 )
