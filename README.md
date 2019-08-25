@@ -113,7 +113,7 @@ Here is a list of `hpcflow` (sub-)commands. Type `<command> --help` to show the 
 | `hpcflow show-stats` | - | ❌           | Show statistics like CPU walltime for the profile set in the current directory. |
 | `hpcflow clean` | - | ✅           | Remove all `hpcflow`-generated files from the current directory (use confirmation?). |
 | `hpcflow stat` | `hfstat` | ❌           | Show status of running tasks and how many completed tasks within this directory. |
-| `hpcflow delete` | `hfdel` | ❌           | Delete one or more jobscripts associated with a workflow. |
+| `hpcflow kill` | `hfkill` | ❌           | Kill one or more jobscripts associated with a workflow. |
 | `hpcflow archive` | - | ✅           | Archive the working directory of a given command group. |
 
 ### Commands that interact with the local database
