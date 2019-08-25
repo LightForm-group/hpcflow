@@ -58,6 +58,7 @@ setup(
         'pyyaml',
         'sqlalchemy==1.3.2',
         'dropbox',
+        'beautifultable==0.8.0'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
