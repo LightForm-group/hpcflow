@@ -194,7 +194,7 @@ def archive(cmd_group_sub_id, task, directory=None):
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--workflow-id', '-w')
+@click.option('--workflow-id', '-w', type=click.INT)
 def root_archive(workflow_id, directory=None):
     print('hpcflow.cli.root_archive', flush=True)
     api.root_archive(
@@ -211,14 +211,14 @@ def stat():
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--workflow-id', '-w')
+@click.option('--workflow-id', '-w', type=click.INT)
 def show_stats(directory=None, workflow_id=None):
     'Show task statistics.'
 
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--workflow-id', '-w')
+@click.option('--workflow-id', '-w', type=click.INT)
 @click.argument('save_path', type=click.Path(exists=False, dir_okay=False))
 def save_stats(save_path, directory=None, workflow_id=None):
     'Save task statistics as a JSON file.'
@@ -227,7 +227,7 @@ def save_stats(save_path, directory=None, workflow_id=None):
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--workflow-id', '-w')
+@click.option('--workflow-id', '-w', type=click.INT)
 @click.option('--json-file')
 @click.option('--json')
 @click.option('--task-ranges', '-t',
