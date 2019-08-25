@@ -1185,11 +1185,7 @@ class CommandGroupSubmission(Base):
     @property
     def directories(self):
         """Get the directory variable values associated with this command group
-        submission.
-
-        TODO: do we need to order these?
-
-        """
+        submission."""
 
         dir_vars_all = self.command_group.directory_variable.variable_values
         # Get only those with correct submission
