@@ -1730,6 +1730,7 @@ class Task(Base):
     def get_stats(self, jsonable=True):
         'Get statistics for this task.'
         out = {
+            'task_id': self.id_,
             'task_number': self.task_number,
             'start_time': self.start_time,
             'end_time': self.end_time,
@@ -1738,7 +1739,7 @@ class Task(Base):
             'hostname': self.hostname,
         }
 
-        if jsonable:
+        if jsonable and self.task_duration:
             # Format `datetime` and `timedelta` objects as strings:
             days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
             hours, hours_rem = divmod(days_rem, 3600)
