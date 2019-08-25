@@ -1155,7 +1155,7 @@ class CommandGroupSubmission(Base):
 
         """
 
-        dir_vars_all = self.command_group.directory_variable.variable_values        
+        dir_vars_all = self.command_group.directory_variable.variable_values
         # Get only those with correct submission
         dirs = []
         for i in dir_vars_all:
@@ -1323,7 +1323,7 @@ class CommandGroupSubmission(Base):
             r'printf "SUBMIT_DIR:\t ${SUBMIT_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "LOG_PATH:\t ${LOG_PATH}\n" >> $LOG_PATH 2>&1',
-            r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',            
+            r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',
             r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
             r'printf "\n" >> $LOG_PATH 2>&1',
         ]
@@ -1569,7 +1569,6 @@ class CommandGroupSubmission(Base):
         task.start_time = start_time
         print('task: {}'.format(task))
 
-
     def set_task_end(self, task_idx):
         context = 'CommandGroupSubmission.set_task_end'
         msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
@@ -1577,7 +1576,7 @@ class CommandGroupSubmission(Base):
         print(msg.format(end_time), flush=True)
         task = self.get_task(task_idx)
         task.end_time = end_time
-        print('task: {}'.format(task))        
+        print('task: {}'.format(task))
 
     def do_archive(self, task_idx):
         """Archive the working directory associated with a given task in this
@@ -1641,7 +1640,7 @@ class VarValue(Base):
                 self.variable_definition.name,
                 self.value,
                 self.order_id,
-            )
+        )
         return out
 
 
@@ -1695,7 +1694,7 @@ class Task(Base):
                 self.command_group_submission_id,
                 self.start_time,
                 self.end_time,
-            )
+        )
         return out
 
     @property
