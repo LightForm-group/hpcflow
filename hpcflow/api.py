@@ -279,11 +279,53 @@ def get_stats(dir_path=None, workflow_id=None, jsonable=True):
     return stats
 
 
+def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100):
+    'Get task statistics formatted like a table.'
+
+    stats = get_stats(dir_path, workflow_id, jsonable=True)
+
+    out = ''
+    for workflow in stats:
+        out += 'Workflow ID: {}\n'.format(workflow['workflow_id'])
+        for submission in workflow['submissions']:
+            out += 'Submission ID: {}\n'.format(submission['submission_id'])
+            for cmd_group_sub in submission['command_group_submissions']:
+                out += 'Command group submission ID: {}\n'.format(
+                    cmd_group_sub['command_group_submission_id'])
+                out += 'Commands:\n'
+                for cmd in cmd_group_sub['commands']:
+                    out += '\t{}\n'.format(cmd)
+                task_table = BeautifulTable(max_width=max_width)
+                task_table.set_style(BeautifulTable.STYLE_BOX)
+                task_table.row_separator_char = ''
+                task_table.column_headers = [
+                    'Task ID',
+                    'Task No.',
+                    'Start',
+                    'End',
+                    'Duration',
+                    'memory',
+                    'hostname',
+                ]
+                for task in cmd_group_sub['tasks']:
+                    task_table.append_row([
+                        task['task_id'],
+                        task['task_number'],
+                        task['start_time'],
+                        task['end_time'],
+                        task['duration'],
+                        task['memory'],
+                        task['hostname'],
+                    ])
+                out += str(task_table) + '\n\n'
+
+    return out
+
+
 def save_stats(save_path, dir_path=None, workflow_id=None):
     'Save task statistics as a JSON file.'
 
     stats = get_stats(dir_path, workflow_id, jsonable=True)
-    pprint(stats)
 
     save_path = Path(save_path)
     with save_path.open('w') as handle:
