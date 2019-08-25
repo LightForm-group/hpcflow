@@ -302,8 +302,8 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100):
                 task_table.row_separator_char = ''
                 task_table.column_headers = [
                     '',
-                    'Task ID',
-                    'Sch. ID',
+                    'TID',
+                    'SID',
                     'Start',
                     'End',
                     'Duration',
@@ -315,11 +315,11 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100):
                         task['order_id'],
                         task['task_id'],
                         task['scheduler_id'],
-                        task['start_time'],
-                        task['end_time'],
-                        task['duration'],
-                        task['memory'],
-                        task['hostname'],
+                        task['start_time'] or '-',
+                        task['end_time'] or '-',
+                        task['duration'] or '-',
+                        task['memory'] or '-',
+                        task['hostname'] or '-',
                     ])
                 out += str(task_table) + '\n\n'
 
