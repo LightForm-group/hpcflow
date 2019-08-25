@@ -10,6 +10,8 @@ from pathlib import Path
 from pprint import pprint
 import json
 
+from beautifultable import BeautifulTable
+
 from hpcflow import CONFIG, profiles
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, Submission, CommandGroupSubmission
