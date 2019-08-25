@@ -1723,7 +1723,9 @@ class Task(Base):
     @property
     def task_duration(self):
         if self.start_time and self.end_time:
-        return self.end_time - self.start_time
+            return self.end_time - self.start_time
+        else:
+            return None
 
     def get_stats(self, jsonable=True):
         'Get statistics for this task.'
