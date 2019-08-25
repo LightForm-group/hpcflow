@@ -1601,12 +1601,8 @@ class CommandGroupSubmission(Base):
 
         sub = self.submission
         scheduler_groups = sub.workflow.get_scheduler_groups(sub)
-
-        sch_group = scheduler_groups['command_groups'][
-            self.command_group_exec_order]
-
+        sch_group = scheduler_groups['command_groups'][self.command_group_exec_order]
         task_step_size = sch_group['task_step_size']
-
         max_num_tasks = scheduler_groups['max_num_tasks'][
             sch_group['scheduler_group_idx']]
 
@@ -1747,7 +1743,7 @@ class Task(Base):
 
             time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, minutes, seconds)
             if days > 0:
-                days_str = 'day' if days == 1 else 'days'                
+                days_str = 'day' if days == 1 else 'days'
                 time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
 
             fmt = r'%Y.%m.%d %H:%M:%S'
