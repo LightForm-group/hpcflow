@@ -531,6 +531,22 @@ class Workflow(Base):
         }
         return out
 
+    def kill_active(self):
+        'Kill any active scheduled jobs associated with the workflow.'
+
+        kill_scheduler_ids = []
+        for sub in self.submissions:
+            for cg_sub in sub.command_group_submissions:
+                if cg_sub.scheduler_job_id is not None:
+                    kill_scheduler_ids.append(cg_sub.scheduler_job_id)
+
+        print('Need to kill: {}'.format(kill_scheduler_ids))
+        del_cmd = ['qdel'] + [str(i) for i in kill_scheduler_ids]
+        proc = run(del_cmd, stdout=PIPE, stderr=PIPE)
+        qdel_out = proc.stdout.decode()
+        qdel_err = proc.stderr.decode()
+        print(qdel_out)
+
 
 class CommandGroup(Base):
     """Class to represent a command group, which is roughly translated into a

@@ -229,6 +229,13 @@ def save_stats(save_path, directory=None, workflow_id=None):
 @cli.command()
 @click.option('--directory', '-d')
 @click.option('--workflow-id', '-w', type=click.INT)
+def kill(directory=None, workflow_id=None):
+    api.kill(directory, workflow_id)
+
+
+@cli.command()
+@click.option('--directory', '-d')
+@click.option('--workflow-id', '-w', type=click.INT)
 @click.option('--json-file')
 @click.option('--json')
 @click.option('--task-ranges', '-t',
