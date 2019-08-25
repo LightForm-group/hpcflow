@@ -1722,6 +1722,7 @@ class Task(Base):
 
     @property
     def task_duration(self):
+        if self.start_time and self.end_time:
         return self.end_time - self.start_time
 
     def get_stats(self, jsonable=True):
