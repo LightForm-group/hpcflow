@@ -414,7 +414,7 @@ class Workflow(Base):
             pat = r'[0-9]+'
             job_id_search = re.search(pat, qsub_out)
             try:
-                job_id_str = job_id_search.group()                
+                job_id_str = job_id_search.group()
 
             except AttributeError:
                 msg = ('Could not retrieve the job ID from the submitted '
@@ -1630,10 +1630,11 @@ class CommandGroupSubmission(Base):
         return out
 
     def get_scheduler_group_info(self):
-        
+
         sch_groups = self.submission.workflow.get_scheduler_groups(self.submission)
         out = sch_groups['command_groups'][self.command_group_exec_order]
         return out
+
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""
@@ -1746,7 +1747,7 @@ class Task(Base):
         step_size = sch_group_info['task_step_size']
         scheduler_range = range(1, 1 + (num_tasks * step_size), step_size)
         scheduler_id = scheduler_range[self.order_id]
-        
+
         return scheduler_id
 
     def get_stats(self, jsonable=True):
