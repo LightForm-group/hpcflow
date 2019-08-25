@@ -1627,6 +1627,11 @@ class CommandGroupSubmission(Base):
         }
         return out
 
+    def get_scheduler_group_info(self):
+        
+        sch_groups = self.submission.workflow.get_scheduler_groups(self.submission)
+        out = sch_groups['command_groups'][self.command_group_exec_order]
+        return out
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""
@@ -1734,7 +1739,13 @@ class Task(Base):
     @property
     def scheduler_id(self):
         'Get the task ID, as understood by the scheduler.'
-        return None
+        sch_group_info = self.command_group_submission.get_scheduler_group_info()
+        num_tasks = sch_group_info['num_tasks']
+        step_size = sch_group_info['task_step_size']
+        scheduler_range = range(1, 1 + (num_tasks * step_size), step_size)
+        scheduler_id = scheduler_range[self.order_id]
+        
+        return scheduler_id
 
     def get_stats(self, jsonable=True):
         'Get statistics for this task.'
