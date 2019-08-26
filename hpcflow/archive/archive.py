@@ -51,6 +51,13 @@ class RootDirectoryName(enum.Enum):
     null = ''
 
 
+class TaskArchiveStatus(enum.Enum):
+
+    pending = 'pending'
+    active = 'active'
+    complete = 'complete'
+
+
 class Archive(Base):
     """Class to represent an archive location."""
 
@@ -143,7 +150,7 @@ class Archive(Base):
 
         self._copy(self.workflow.directory, self.path.joinpath(archive_dir), exclude)
 
-    def execute_with_lock(self, directory_value, exclude, archive_dir):
+    def execute_with_lock(self, session, task):
         """Execute the archive process of a given working directory.
 
         Parameters
@@ -153,11 +160,14 @@ class Archive(Base):
 
         """
 
+        cg_sub = task.command_group_submission
+        directory_value = task.get_working_directory()
+        exclude = cg_sub.command_group.archive_excludes
+        archive_dir = cg_sub.command_group.archive_directory
+
         root_dir = self.command_groups[0].workflow.directory
         src_dir = root_dir.joinpath(directory_value.value)
         dst_dir = self.path.joinpath(archive_dir, directory_value.value)
-
-        session = Session.object_session(self)
 
         sleep_time = 10
         context = 'Archive.execute_with_lock'
@@ -166,6 +176,10 @@ class Archive(Base):
         unblock_msg = ('{{}} {}: Archiving available. Archiving from source directory: '
                        '"{}" to destination directory: "{}".'.format(
                            context, src_dir, dst_dir))
+        apply_block_msg = ('{{}} {}: Applying archive lock to directory: {}.'.format(
+            context, directory_value))
+        remove_block_msg = ('{{}} {}: Removing archive lock from directory: {}'.format(
+            context, directory_value))
 
         blocked = True
         while blocked:
@@ -179,6 +193,7 @@ class Archive(Base):
                 try:
                     self.directories_archiving.append(directory_value)
                     session.commit()
+                    print(apply_block_msg.format(datetime.now()), flush=True)
                     blocked = False
 
                 except IntegrityError:
@@ -195,9 +210,13 @@ class Archive(Base):
 
                 if not blocked:
                     print(unblock_msg.format(datetime.now()), flush=True)
+                    task.archive_status = TaskArchiveStatus('active')
+                    session.commit()
                     self._copy(src_dir, dst_dir, exclude)
+                    task.archive_status = TaskArchiveStatus('complete')
                     self.directories_archiving.remove(directory_value)
                     session.commit()
+                    print(remove_block_msg.format(datetime.now()), flush=True)
 
     def _copy(self, src_dir, dst_dir, exclude):
         """Do the actual copying.
