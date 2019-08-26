@@ -174,7 +174,7 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
                 fn_db_path = os.path.join(dropbox_path, rel_path)
                 dst_fn = normalise_path(fn_db_path)
 
-                print('Uploading file: {}'.format(file_name))
+                print('Uploading file: {}'.format(file_name), flush=True)
                 try:
                     upload_dropbox_file(
                         dbx,
