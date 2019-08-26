@@ -155,7 +155,7 @@ def clean(dir_path=None):
     project.clean()
 
 
-def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
+def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
     """Write the commands files for a given command group submission.
 
     Parameters
@@ -175,7 +175,7 @@ def write_cmd(cmd_group_sub_id, task=None, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.write_cmd(project)
+    cg_sub.write_runtime_files(project)
 
     session.commit()
     session.close()
@@ -207,7 +207,7 @@ def set_task_end(cmd_group_sub_id, task_idx, dir_path=None):
     session.close()
 
 
-def archive(cmd_group_sub_id, task, dir_path=None):
+def archive(cmd_group_sub_id, task_idx, dir_path=None):
     """Initiate an archive of a given task.
 
     Parameters
@@ -215,8 +215,8 @@ def archive(cmd_group_sub_id, task, dir_path=None):
     cmd_group_sub_id : int
         ID of the command group submission for which an archive is to be
         started.
-    task : int
-        The task to be archived (or rather, the task whose working directory
+    task_idx : int
+        The task index to be archived (or rather, the task whose working directory
         will be archived).
     dir_path : str or Path, optional
         The directory in which the Workflow will be generated. By default, this
@@ -229,7 +229,7 @@ def archive(cmd_group_sub_id, task, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.do_archive(task)
+    cg_sub.do_archive(task_idx)
 
     session.commit()
     session.close()
@@ -281,7 +281,8 @@ def get_stats(dir_path=None, workflow_id=None, jsonable=True):
     return stats
 
 
-def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100):
+def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
+                        show_task_end=False):
     'Get task statistics formatted like a table.'
 
     stats = get_stats(dir_path, workflow_id, jsonable=True)
@@ -300,29 +301,37 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100):
                 task_table = BeautifulTable(max_width=max_width)
                 task_table.set_style(BeautifulTable.STYLE_BOX)
                 task_table.row_separator_char = ''
-                task_table.column_headers = [
+                headers = [
                     '',
                     'TID',
                     'SID',
                     'Dir.',
                     'Start',
-                    'End',
                     'Duration',
+                    'Archive',
                     'memory',
                     'hostname',
                 ]
+                if show_task_end:
+                    headers = headers[:5] + ['End'] + headers[5:]
+                task_table.column_headers = headers
+
                 for task in cmd_group_sub['tasks']:
-                    task_table.append_row([
+                    row = [
                         task['order_id'],
                         task['task_id'],
                         task['scheduler_id'],
                         task['working_directory'],
-                        task['start_time'] or '-',
-                        task['end_time'] or '-',
+                        task['start_time'] or 'pending',
                         task['duration'] or '-',
+                        task['archive_status'] or '-',
                         task['memory'] or '-',
                         task['hostname'] or '-',
-                    ])
+                    ]
+                    if show_task_end:
+                        row = row[:5] + [task['end_time'] or '-'] + row[5:]
+                    task_table.append_row(row)
+
                 out += str(task_table) + '\n\n'
 
     return out
