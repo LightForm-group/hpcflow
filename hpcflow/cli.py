@@ -158,7 +158,7 @@ def make(directory=None, profiles=None, json_file=None, json=None):
 @click.argument('cmd_group_sub_id', type=click.INT)
 def write_cmd(cmd_group_sub_id, task=None, directory=None):
     print('hpcflow.cli.write_cmd', flush=True)
-    api.write_cmd(cmd_group_sub_id, task, directory)
+    api.write_runtime_files(cmd_group_sub_id, task, directory)
 
 
 @cli.command()
