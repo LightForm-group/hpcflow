@@ -281,7 +281,7 @@ class Workflow(Base):
 
         # Write a jobscript for each command group submission:
         js_paths = []
-        for idx, cg_sub in enumerate(sub.command_group_submissions):
+        for cg_sub in sub.command_group_submissions:
 
             for task_num in range(cg_sub.num_outputs):
                 Task(cg_sub, task_num)
