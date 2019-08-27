@@ -160,6 +160,9 @@ class Archive(Base):
 
         """
 
+        print('Archive.execute_with_lock: task.is_archive_required: {}'.format(
+            task.is_archive_required()))
+
         cg_sub = task.command_group_submission
         directory_value = task.get_working_directory()
         exclude = cg_sub.command_group.archive_excludes
@@ -169,7 +172,7 @@ class Archive(Base):
         src_dir = root_dir.joinpath(directory_value.value)
         dst_dir = self.path.joinpath(archive_dir, directory_value.value)
 
-        sleep_time = 10
+        sleep_time = 5
         context = 'Archive.execute_with_lock'
         block_msg = ('{{}} {}: Archiving blocked. Sleeping for {} '
                      'seconds'.format(context, sleep_time))
@@ -180,43 +183,65 @@ class Archive(Base):
             context, directory_value))
         remove_block_msg = ('{{}} {}: Removing archive lock from directory: {}'.format(
             context, directory_value))
+        arch_done_msg = ('{{}} {}: Archive of the working directory {} performed by '
+                         'another task.'.format(context, directory_value))
 
-        blocked = True
-        while blocked:
+        if task.is_archive_required():
 
-            session.refresh(self)
+            blocked = True
+            while blocked:
 
-            if directory_value in self.directories_archiving:
-                print(block_msg.format(datetime.now()), flush=True)
-                sleep(sleep_time)
-            else:
-                try:
-                    self.directories_archiving.append(directory_value)
-                    session.commit()
-                    print(apply_block_msg.format(datetime.now()), flush=True)
-                    blocked = False
-
-                except IntegrityError:
-                    # Another process has already set `directories_archiving`
-                    session.rollback()
-                    print(block_msg.format(datetime.now()), flush=True)
-                    sleep(sleep_time)
-
-                except OperationalError:
-                    # Database is likely locked.
-                    session.rollback()
-                    print(block_msg.format(datetime.now()), flush=True)
-                    sleep(sleep_time)
-
-                if not blocked:
-                    print(unblock_msg.format(datetime.now()), flush=True)
-                    task.archive_status = TaskArchiveStatus('active')
-                    session.commit()
-                    self._copy(src_dir, dst_dir, exclude)
+                session.refresh(self)
+                if not task.is_archive_required():
+                    print(arch_done_msg.format(datetime.now()), flush=True)
                     task.archive_status = TaskArchiveStatus('complete')
-                    self.directories_archiving.remove(directory_value)
                     session.commit()
-                    print(remove_block_msg.format(datetime.now()), flush=True)
+                    return
+
+                if directory_value in self.directories_archiving:
+                    print(block_msg.format(datetime.now()), flush=True)
+                    sleep(sleep_time)
+                else:
+                    try:
+                        self.directories_archiving.append(directory_value)
+                        session.commit()
+                        print(apply_block_msg.format(datetime.now()), flush=True)
+                        blocked = False
+
+                    except IntegrityError:
+                        # Another process has already set `directories_archiving`
+                        session.rollback()
+                        print(block_msg.format(datetime.now()), flush=True)
+                        sleep(sleep_time)
+
+                    except OperationalError:
+                        # Database is likely locked.
+                        session.rollback()
+                        print(block_msg.format(datetime.now()), flush=True)
+                        sleep(sleep_time)
+
+                    if not blocked:
+
+                        start_time = datetime.now()
+                        print(unblock_msg.format(start_time), flush=True)
+                        task.archive_status = TaskArchiveStatus('active')
+                        task.archive_start_time = start_time
+                        session.commit()
+
+                        self._copy(src_dir, dst_dir, exclude)
+
+                        end_time = datetime.now()
+                        task.archive_status = TaskArchiveStatus('complete')
+                        task.archive_end_time = end_time
+                        self.directories_archiving.remove(directory_value)
+                        session.commit()
+
+                        print(remove_block_msg.format(end_time), flush=True)
+
+        else:
+            print(arch_done_msg.format(datetime.now()), flush=True)
+            task.archive_status = TaskArchiveStatus('complete')
+            session.commit()
 
     def _copy(self, src_dir, dst_dir, exclude):
         """Do the actual copying.

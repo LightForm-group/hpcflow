@@ -21,7 +21,7 @@ from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
-from hpcflow.utils import coerce_same_length, zeropad
+from hpcflow.utils import coerce_same_length, zeropad, format_time_delta
 from hpcflow.validation import validate_task_multiplicity
 from hpcflow.variables import (
     select_cmd_group_var_names, select_cmd_group_var_definitions,
@@ -1327,6 +1327,7 @@ class CommandGroupSubmission(Base):
                      'seconds'.format(context, sleep_time))
         unblock_msg = ('{{}} {}: Commands not written and writing available. Writing '
                        'command file.'.format(context))
+        written_msg = ('{{}} {}: Command files already written.'.format(context))
 
         if not self.commands_written:
 
@@ -1334,6 +1335,9 @@ class CommandGroupSubmission(Base):
             while blocked:
 
                 session.refresh(self)
+                if self.commands_written:
+                    print(written_msg.format(datetime.now()), flush=True)
+                    return
 
                 if self.is_command_writing:
                     print(block_msg.format(datetime.now()), flush=True)
@@ -1619,12 +1623,17 @@ class Task(Base):
     memory = Column(Float)
     hostname = Column(String(255))
     archive_status = Column(Enum(TaskArchiveStatus), nullable=True)
+    _archive_start_time = Column('archive_start_time', DateTime, nullable=True)
+    _archive_end_time = Column('archive_end_time', DateTime, nullable=True)
+    archived_task_id = Column(Integer, ForeignKey('task.id'), nullable=True)
 
     command_group_submission_id = Column(
         Integer, ForeignKey('command_group_submission.id'))
 
     command_group_submission = relationship(
         'CommandGroupSubmission', back_populates='tasks', uselist=False)
+    
+    archived_task = relationship('Task', uselist=False, remote_side=id_)
 
     def __init__(self, command_group_submission, order_id):
         self.order_id = order_id
@@ -1668,6 +1677,37 @@ class Task(Base):
 
         return scheduler_id
 
+    @property
+    def archive_start_time(self):
+        if self.archived_task:
+            # Archive for this task was handled by another task with the same working dir:
+            return self.archived_task.archive_start_time            
+        else:
+            return self._archive_start_time
+
+    @archive_start_time.setter
+    def archive_start_time(self, start_time):
+        self._archive_start_time = start_time
+
+    @property
+    def archive_end_time(self):
+        if self.archived_task:
+            # Archive for this task was handled by another task with the same working dir:
+            return self.archived_task.archive_end_time
+        else:
+            return self._archive_end_time
+
+    @archive_end_time.setter
+    def archive_end_time(self, end_time):
+        self._archive_end_time = end_time
+
+    @property
+    def archive_duration(self):
+        if self.archive_start_time and self.archive_end_time:
+            return self.archive_end_time - self.archive_start_time
+        else:
+            return None        
+
     def get_working_directory(self):
         'Get the "working directory" of this task.'
         dir_vals = self.command_group_submission.directories
@@ -1689,6 +1729,10 @@ class Task(Base):
             'start_time': self.start_time,
             'end_time': self.end_time,
             'duration': self.duration,
+            'archive_start_time': self.archive_start_time,
+            'archive_end_time': self.archive_end_time,
+            'archive_duration': self.archive_duration,
+            'archived_task_id': self.archived_task_id,
             'memory': self.memory,
             'hostname': self.hostname,
             'working_directory': self.get_working_directory_value(),
@@ -1698,29 +1742,64 @@ class Task(Base):
         if jsonable:
 
             if self.duration:
-                # Format `datetime` and `timedelta` objects as strings:
-                days, days_rem = divmod(out['duration'].total_seconds(), 3600 * 24)
-                hours, hours_rem = divmod(days_rem, 3600)
-                mins, seconds = divmod(hours_rem, 60)
+                out['duration'] = format_time_delta(out['duration'])
+            
+            if self.archive_duration:
+                out['archive_duration'] = format_time_delta(out['archive_duration'])
 
-                time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, mins, seconds)
-                if days > 0:
-                    days_str = 'day' if days == 1 else 'days'
-                    time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
-                out['duration'] = time_diff_fmt
-
-            fmt = r'%Y.%m.%d %H:%M:%S'
+            dt_fmt = r'%Y.%m.%d %H:%M:%S'
 
             if self.start_time:
-                out['start_time'] = out['start_time'].strftime(fmt)
+                out['start_time'] = out['start_time'].strftime(dt_fmt)
 
             if self.end_time:
-                out['end_time'] = out['end_time'].strftime(fmt)
+                out['end_time'] = out['end_time'].strftime(dt_fmt)
+
+            if self.archive_start_time:
+                out['archive_start_time'] = out['archive_start_time'].strftime(dt_fmt)
+
+            if self.archive_end_time:
+                out['archive_end_time'] = out['archive_end_time'].strftime(dt_fmt)                
 
             if self.archive_status:
                 out['archive_status'] = self.archive_status.value
 
         return out
+
+    def get_same_directory_tasks(self):
+        """Get a list of other Tasks within the same command group that share the same
+        working directory"""
+        same_dir_tasks = []
+        for i in self.command_group_submission.tasks:
+            if i is self:
+                continue
+            elif i.get_working_directory() is self.get_working_directory():
+                same_dir_tasks.append(i)
+
+        print('Task.get_same_directory_tasks: same_dir_tasks: {}'.format(same_dir_tasks),
+              flush=True)
+
+        return same_dir_tasks
+
+    def is_archive_required(self):
+        """Check if archive of this task is required. It is not required if a different
+        task in the same command group submission with the same working directory begun
+        its own archive after the commands of this command completed."""
+
+        if not self.end_time:
+            msg = ('`Task.is_archive_required` should not be called unit the task has '
+                   'completed; {} has not completed.'.format(self))
+            raise RuntimeError(msg)
+
+        for i in self.get_same_directory_tasks():
+            print('Checking if other task {} archived started after this task '
+                  '({}) finished.'.format(i, self), flush=True)
+            if i.archive_start_time:
+                if i.archive_start_time > self.end_time:
+                    self.archived_task = i
+                    return False
+
+        return True
 
 
 class SchedulerGroup(object):

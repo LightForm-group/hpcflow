@@ -61,3 +61,17 @@ def zeropad(num, largest):
     padded = '{0:0{width}}'.format(num, width=num_digits)
 
     return padded
+
+
+def format_time_delta(time_delta):
+
+    days, days_rem = divmod(time_delta.total_seconds(), 3600 * 24)
+    hours, hours_rem = divmod(days_rem, 3600)
+    mins, seconds = divmod(hours_rem, 60)
+
+    time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, mins, seconds)
+    if days > 0:
+        days_str = 'day' if days == 1 else 'days'
+        time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
+
+    return time_diff_fmt
