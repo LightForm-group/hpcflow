@@ -346,7 +346,7 @@ def _upload_dropbox_dir(dbx, local_dir, dropbox_dir, overwrite=False, autorename
 
         print('Uploading from root directory: {}'.format(root), flush=True)
 
-        for file_name in files:
+        for file_name in sorted(files):
 
             up_file = False
 
