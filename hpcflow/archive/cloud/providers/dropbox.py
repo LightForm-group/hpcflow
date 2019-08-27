@@ -7,6 +7,7 @@ This module provides interactivity with a Dropbox account for archiving.
 import os
 import posixpath
 import fnmatch
+from pathlib import Path
 from pprint import pprint
 
 import dropbox as dropbox_api
@@ -81,15 +82,15 @@ def normalise_path(path):
     return path
 
 
-def upload_dropbox_file(dbx, local_path, dropbox_path, overwrite=False,
+def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
                         autorename=False):
     """
     Parameters
     ----------
     dbx: Dropbox
-    local_path : str
+    local_path : str or Path
         Path of file on local computer to upload to dropbox.
-    dropbox_path : str
+    dropbox_dir : str or Path
         Directory on dropbox to upload the file to.
     overwrite : bool
         If True, the file overwrites an existing file with the same name.
@@ -98,16 +99,25 @@ def upload_dropbox_file(dbx, local_path, dropbox_path, overwrite=False,
 
     """
 
+    local_path = Path(local_path)
+    dropbox_path = normalise_path(Path(dropbox_dir).joinpath(local_path.name))
+
     if overwrite:
         mode = dropbox_api.dropbox.files.WriteMode('overwrite', None)
     else:
         mode = dropbox_api.dropbox.files.WriteMode('add', None)
 
     try:
-        with open(local_path, mode='rb') as f:
+        with local_path.open(mode='rb') as handle:
 
             try:
-                dbx.files_upload(f.read(), dropbox_path, mode=mode, autorename=autorename)
+                dbx.files_upload(
+                    handle.read(),
+                    dropbox_path,
+                    mode=mode,
+                    autorename=autorename
+                )
+
             except dropbox_api.exceptions.ApiError as err:
                 msg = ('Cloud provider error. {}'.format(err))
                 raise CloudProviderError(msg)
@@ -145,12 +155,20 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
 
     print('hpcflow.archive.cloud.providers.dropbox.upload_dropbox_dir', flush=True)
 
+    if not exclude:
+        exclude = []
+
     # Validation
     if not os.path.isdir(local_path):
         raise ValueError(
             'Specified `local_path` is not a directory: {}'.format(local_path))
 
+    local_path = Path(local_path)
+    dropbox_path = Path(dropbox_path)
+
     for root, dirs, files in os.walk(local_path):
+
+        root_test = Path(root)
 
         dirs[:] = [d for d in dirs if d not in exclude]
 
@@ -168,26 +186,23 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
 
             if up_file:
 
-                # Source path
-                src_fn = os.path.join(root, file_name)
-
-                # Destination path
-                rel_path = os.path.relpath(src_fn, local_path)
-                fn_db_path = os.path.join(dropbox_path, rel_path)
-                dst_fn = normalise_path(fn_db_path)
+                src_file = root_test.joinpath(file_name)
+                rel_path = src_file.relative_to(local_path)
+                dst_dir = dropbox_path.joinpath(rel_path.parent)
 
                 print('Uploading file: {}'.format(file_name), flush=True)
                 try:
                     upload_dropbox_file(
                         dbx,
-                        src_fn,
-                        dst_fn,
+                        src_file,
+                        dst_dir,
                         overwrite=overwrite,
                         autorename=autorename
                     )
                 except ArchiveError as err:
                     print('Archive error: {}'.format(err), flush=True)
                     continue
+
                 except CloudProviderError as err:
                     print('Cloud provider error: {}'.format(err), flush=True)
                     continue
