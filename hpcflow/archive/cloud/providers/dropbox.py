@@ -9,6 +9,7 @@ import posixpath
 import fnmatch
 from pathlib import Path
 from pprint import pprint
+from datetime import datetime
 
 import dropbox as dropbox_api
 
@@ -82,8 +83,95 @@ def normalise_path(path):
     return path
 
 
-def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
-                        autorename=False):
+def archive_file(dbx, local_path, dropbox_dir, check_modified_time=True):
+    """Upload a file to a dropbox directory such that if the local file is newer than the
+    copy on Dropbox, the newer file overwrites the older file, and if the local file is
+    older than the copy on Dropbox, the local file is uploaded with an "auto-incremented"
+    name.
+
+    Note that if the modified times are different, the file still won't be uploaded
+    by dropbox if the file contents are identical. The point of checking for the
+    modified times is to save some time by not having Dropbox check file contents.    
+
+    Parameters
+    ----------
+    dbx: Dropbox
+    local_path : str or Path
+        Path of file on local computer to upload to dropbox.
+    dropbox_dir : str or Path
+        Directory on Dropbox into which the file should be uploaded.
+
+    """
+
+    local_path = Path(local_path)
+    dropbox_path = normalise_path(Path(dropbox_dir).joinpath(local_path.name))
+
+    if not check_modified_time:
+        overwrite = True
+        autorename = False
+        client_modified = None
+
+    else:
+        # Note: Dropbox culls microseconds from the datetime passed as the
+        # `client_modified` parameter (it does not round).
+        # Ref: ("https://www.dropboxforum.com/t5/API-Support-Feedback/Python-API-client"
+        #           "-modified-resolution/m-p/362170/highlight/true#M20596")
+        ts_sec = local_path.stat().st_mtime_ns / 1e9
+        dt = datetime.utcfromtimestamp(ts_sec)
+        client_modified = datetime(  # no microseconds
+            year=dt.year,
+            month=dt.month,
+            day=dt.day,
+            hour=dt.hour,
+            minute=dt.minute,
+            second=dt.second,
+        )
+
+        try:
+            # Check for existing file
+            existing_file = dbx.files_get_metadata(dropbox_path)
+            existing_modified = existing_file.client_modified
+
+            # print('client_modified: {!r}'.format(client_modified))
+            # print('existing_modified: {!r}'.format(existing_modified))
+
+            if client_modified == existing_modified:
+                # print('client_modified time same!')
+                return
+
+            elif client_modified < existing_modified:
+                overwrite = False
+                autorename = True
+                # print('client file older!')
+
+            elif client_modified > existing_modified:
+                overwrite = True
+                autorename = False
+                # print('client file newer!')
+
+        except dropbox_api.exceptions.ApiError:
+
+            # print('File does not exist.')
+
+            overwrite = False
+            autorename = False
+
+        except:
+            msg = 'Unexpected error.'
+            raise CloudProviderError(msg)
+
+    _upload_dropbox_file(
+        dbx,
+        local_path,
+        dropbox_path,
+        overwrite=overwrite,
+        autorename=autorename,
+        client_modified=client_modified
+    )
+
+
+def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False, autorename=True,
+                        client_modified=None):
     """
     Parameters
     ----------
@@ -91,7 +179,7 @@ def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
     local_path : str or Path
         Path of file on local computer to upload to dropbox.
     dropbox_dir : str or Path
-        Directory on dropbox to upload the file to.
+        Directory on Dropbox into which the file should be uploaded.
     overwrite : bool
         If True, the file overwrites an existing file with the same name.
     autorename : bool
@@ -101,6 +189,32 @@ def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
 
     local_path = Path(local_path)
     dropbox_path = normalise_path(Path(dropbox_dir).joinpath(local_path.name))
+    _upload_dropbox_file(
+        dbx,
+        local_path,
+        dropbox_path,
+        overwrite=overwrite,
+        autorename=autorename,
+        client_modified=client_modified,
+    )
+
+
+def _upload_dropbox_file(dbx, local_path, dropbox_path, overwrite=False, autorename=True,
+                         client_modified=None):
+    """
+    Parameters
+    ----------
+    dbx: Dropbox
+    local_path : Path
+        Path of file on local computer to upload to dropbox.
+    dropbox_path : str
+        Path to upload the file to nn dropbox.
+    overwrite : bool
+        If True, the file overwrites an existing file with the same name.
+    autorename : bool
+        If True, rename the file if there is a conflict.
+
+    """
 
     if overwrite:
         mode = dropbox_api.dropbox.files.WriteMode('overwrite', None)
@@ -115,7 +229,8 @@ def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
                     handle.read(),
                     dropbox_path,
                     mode=mode,
-                    autorename=autorename
+                    autorename=autorename,
+                    client_modified=client_modified,
                 )
 
             except dropbox_api.exceptions.ApiError as err:
@@ -129,15 +244,44 @@ def upload_dropbox_file(dbx, local_path, dropbox_dir, overwrite=False,
         raise ArchiveError(err)
 
 
-def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
-                       autorename=False, exclude=None):
+def archive_directory(dbx, local_dir, dropbox_dir, exclude=None):
+    """
+    Archive a the contents of a local directory into a directory on dropbox.
+
+    Any files in the dropbox directory not in the source directory are ignored.
+
+    Parameters
+    ----------
+    dbx: Dropbox
+    local_dir : str or Path
+        Path of directory on local computer to upload to dropbox.
+    dropbox_dir : str or Path
+        Directory on dropbox to upload the files to.
+
+    """
+
+    print('hpcflow.archive.cloud.providers.dropbox.archive_directory', flush=True)
+
+    local_dir = Path(local_dir)
+    dropbox_dir = Path(dropbox_dir)
+    _upload_dropbox_dir(
+        dbx,
+        local_dir,
+        dropbox_dir,
+        exclude=exclude,
+        archive=True,
+    )
+
+
+def upload_dropbox_dir(dbx, local_dir, dropbox_dir, overwrite=False, autorename=False,
+                       exclude=None):
     """
     Parameters
     ----------
     dbx: Dropbox
-    local_path : str
-        Path of file on local computer to upload to dropbox.
-    dropbox_path : str
+    local_dir : str or Path
+        Path of directory on local computer to upload to dropbox.
+    dropbox_dir : str or Path
         Directory on dropbox to upload the file to.
     overwrite : bool
         If True, the file overwrites an existing file with the same name.
@@ -147,26 +291,54 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
         List of file or directory names to exclude, matched with `fnmatch` for
         files, or compared directly for directories.
 
+    """
+
+    local_dir = Path(local_dir)
+    dropbox_dir = Path(dropbox_dir)
+    _upload_dropbox_dir(
+        dbx,
+        local_dir,
+        dropbox_dir,
+        overwrite=overwrite,
+        autorename=autorename,
+        exclude=exclude,
+        archive=False,
+    )
+
+
+def _upload_dropbox_dir(dbx, local_dir, dropbox_dir, overwrite=False, autorename=False,
+                        exclude=None, archive=False):
+    """
+    Parameters
+    ----------
+    dbx: Dropbox
+    local_dir : Path
+        Path of directory on local computer to upload to dropbox.
+    dropbox_dir : Path
+        Directory on dropbox to upload the file to.
+    overwrite : bool
+        If True, the file overwrites an existing file with the same name.
+    autorename : bool
+        If True, rename the file if there is a conflict.
+    exclude : list, optional
+        List of file or directory names to exclude, matched with `fnmatch` for
+        files, or compared directly for directories.
+    archive : bool, optional
+
     Notes
     -----
     Does not upload empty directories.
 
     """
 
-    print('hpcflow.archive.cloud.providers.dropbox.upload_dropbox_dir', flush=True)
-
     if not exclude:
         exclude = []
 
     # Validation
-    if not os.path.isdir(local_path):
-        raise ValueError(
-            'Specified `local_path` is not a directory: {}'.format(local_path))
+    if not local_dir.is_dir():
+        raise ValueError('Specified `local_dir` is not a directory: {}'.format(local_dir))
 
-    local_path = Path(local_path)
-    dropbox_path = Path(dropbox_path)
-
-    for root, dirs, files in os.walk(local_path):
+    for root, dirs, files in os.walk(str(local_dir)):
 
         root_test = Path(root)
 
@@ -187,18 +359,25 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
             if up_file:
 
                 src_file = root_test.joinpath(file_name)
-                rel_path = src_file.relative_to(local_path)
-                dst_dir = dropbox_path.joinpath(rel_path.parent)
+                rel_path = src_file.relative_to(local_dir)
+                dst_dir = dropbox_dir.joinpath(rel_path.parent)
 
                 print('Uploading file: {}'.format(file_name), flush=True)
                 try:
-                    upload_dropbox_file(
-                        dbx,
-                        src_file,
-                        dst_dir,
-                        overwrite=overwrite,
-                        autorename=autorename
-                    )
+                    if archive:
+                        archive_file(
+                            dbx,
+                            src_file,
+                            dst_dir
+                        )
+                    else:
+                        upload_dropbox_file(
+                            dbx,
+                            src_file,
+                            dst_dir,
+                            overwrite=overwrite,
+                            autorename=autorename
+                        )
                 except ArchiveError as err:
                     print('Archive error: {}'.format(err), flush=True)
                     continue

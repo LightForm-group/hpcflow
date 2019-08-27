@@ -263,7 +263,7 @@ class Archive(Base):
 
             if self.cloud_provider != CloudProvider.null:
                 try:
-                    self.cloud_provider.upload(src_dir, dst_dir, ignore)
+                    self.cloud_provider.archive_directory(src_dir, dst_dir, ignore)
                 except (CloudProviderError, CloudCredentialsError, ArchiveError) as err:
                     raise ArchiveError(err)
             else:
