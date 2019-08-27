@@ -107,10 +107,12 @@ def upload_dropbox_file(dbx, local_path, dropbox_path, overwrite=False,
         with open(local_path, mode='rb') as f:
 
             try:
-                dbx.files_upload(f.read(), dropbox_path,
-                                 mode=mode, autorename=autorename)
+                dbx.files_upload(f.read(), dropbox_path, mode=mode, autorename=autorename)
             except dropbox_api.exceptions.ApiError as err:
                 msg = ('Cloud provider error. {}'.format(err))
+                raise CloudProviderError(msg)
+            except:
+                msg = 'Unexpected error.'
                 raise CloudProviderError(msg)
 
     except FileNotFoundError as err:
@@ -185,4 +187,7 @@ def upload_dropbox_dir(dbx, local_path, dropbox_path, overwrite=False,
                     )
                 except ArchiveError as err:
                     print('Archive error: {}'.format(err), flush=True)
+                    continue
+                except CloudProviderError as err:
+                    print('Cloud provider error: {}'.format(err), flush=True)
                     continue
