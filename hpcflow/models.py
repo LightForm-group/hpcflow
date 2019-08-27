@@ -1536,6 +1536,11 @@ class CommandGroupSubmission(Base):
         """Archive the working directory associated with a given task in this command
         group submission."""
 
+        # Adding a small delay increases the chance that `Task.is_archive_required` will
+        # be False (and so save some time overall), in the case where all tasks start at
+        # roughly the same time:
+        sleep(10)
+
         session = Session.object_session(self)
         task = session.query(Task).filter_by(
             command_group_submission_id=self.id_,
