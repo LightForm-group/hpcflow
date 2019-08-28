@@ -61,7 +61,7 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         msg = ('Specify only one of `profile_list`, `json_file` or `json_str`.')
         raise ValueError(msg)
 
-    project = Project(dir_path, clean=clean)  # `clean=True` whilst developing!
+    project = Project(dir_path, clean=clean)
 
     if json_str:
         workflow_dict = json.loads(json_str)
