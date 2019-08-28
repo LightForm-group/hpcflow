@@ -34,8 +34,17 @@ class CloudProvider(enum.Enum):
             dropbox.archive_directory(
                 dropbox.get_dropbox(), local_path, remote_path, exclude)
 
+    def get_directories(self, path):
+        'Get sub directories within a path'
+
+        if self.name == 'dropbox':
+            dbx = dropbox.get_dropbox()
+            return dropbox.get_folders(dbx, path)
+
     def check_exists(self, directory):
         'Check a given directory exists on the cloud storage.'
+
+        print('hpcflow.archive.cloud.CloudProvider.check_exists', flush=True)
 
         if self.name == 'dropbox':
             directory = dropbox.normalise_path(directory)
