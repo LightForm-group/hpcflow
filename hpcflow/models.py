@@ -3,7 +3,6 @@
 
 import re
 import os
-import random
 from datetime import datetime
 from math import ceil, floor
 from pathlib import Path
@@ -22,7 +21,7 @@ from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
-from hpcflow.utils import coerce_same_length, zeropad, format_time_delta
+from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex
 from hpcflow.validation import validate_task_multiplicity
 from hpcflow.variables import (
     select_cmd_group_var_names, select_cmd_group_var_definitions,
@@ -834,9 +833,6 @@ class Submission(Base):
         if self.workflow.has_alternate_scratch:
             # Create new directory on alternate scratch for this submission.
 
-            def get_alt_dirname():
-                return ''.join([random.choice('0123456789abcdef') for i in range(10)])
-
             # Get list of unique alternate scratches:
             alt_scratches = []
             for cg in self.workflow.command_groups:
@@ -846,11 +842,12 @@ class Submission(Base):
             # Find a suitable alternate scratch directory name for this submission:
             count = 0
             MAX_COUNT = 10
-            alt_dirname = get_alt_dirname()
+            hex_length = 10
+            alt_dirname = get_random_hex(hex_length)
             while True:
                 if all([not i.joinpath(alt_dirname).exists() for i in alt_scratches]):
                     break
-                alt_dirname = get_alt_dirname()
+                alt_dirname = get_random_hex(hex_length)
                 count += 1
                 if count > MAX_COUNT:
                     msg = ('Could not find a suitable alternate scratch directory name '

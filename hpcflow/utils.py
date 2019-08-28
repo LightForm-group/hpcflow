@@ -4,6 +4,8 @@ Utility functions that are not particularly specific to `hpcflow`.
 
 """
 
+import random
+
 
 def coerce_same_length(all_lists):
     """
@@ -75,3 +77,7 @@ def format_time_delta(time_delta):
         time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
 
     return time_diff_fmt
+
+
+def get_random_hex(n=10):
+    return ''.join([random.choice('0123456789abcdef') for i in range(n)])
