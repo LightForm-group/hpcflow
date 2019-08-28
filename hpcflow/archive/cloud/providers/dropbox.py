@@ -47,6 +47,24 @@ def check_access():
     print('Successfully connected to Dropbox.', flush=True)
 
 
+def get_files(dbx, path):
+    path = normalise_path(path)
+    out = []
+    for i in dbx.files_list_folder(path).entries:
+        if isinstance(i, dropbox_api.files.FileMetadata):
+            out.append(i.name)
+    return out
+
+
+def get_folders(dbx, path):
+    path = normalise_path(path)
+    out = []
+    for i in dbx.files_list_folder(path).entries:
+        if isinstance(i, dropbox_api.files.FolderMetadata):
+            out.append(i.name)
+    return out
+
+
 def is_file(dbx, path):
     """Check given path on dropbox is a file."""
     meta = dbx.files_get_metadata(path)
