@@ -3,6 +3,7 @@
 
 import re
 import os
+import random
 from datetime import datetime
 from math import ceil, floor
 from pathlib import Path
@@ -176,6 +177,10 @@ class Workflow(Base):
         msg = ('Cannot find variable definition with '
                'name "{}"'.format(variable_name))
         raise ValueError(msg)
+
+    @property
+    def has_alternate_scratch(self):
+        return any([i.alternate_scratch for i in self.command_groups])
 
     @property
     def directory(self):
@@ -472,6 +477,7 @@ class CommandGroup(Base):
     profile_order = Column(Integer, nullable=True)
     archive_excludes = Column(JSON, nullable=True)
     archive_directory = Column(String(255), nullable=True)
+    _alternate_scratch = Column('alternate_scratch', String(255), nullable=True)
 
     archive = relationship('Archive', back_populates='command_groups')
     workflow = relationship('Workflow', back_populates='command_groups')
@@ -484,7 +490,7 @@ class CommandGroup(Base):
                  exec_order=None, nesting=None, modules=None,
                  scheduler_options=None, profile_name=None,
                  profile_order=None, archive=None, archive_excludes=None,
-                 archive_directory=None):
+                 archive_directory=None, alternate_scratch=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -532,6 +538,8 @@ class CommandGroup(Base):
             when archiving this command group.
         archive_directory : str or Path, optional
             Name of the directory in which the archive for this command group will reside.
+        alternate_scratch : str, optional
+            Location of alternate scratch in which to run commands.
 
         TODO: document how `nesting` interacts with `is_job_array`.
 
@@ -553,6 +561,8 @@ class CommandGroup(Base):
         self.archive_excludes = archive_excludes
         self.archive_directory = archive_directory
 
+        self._alternate_scratch = alternate_scratch
+
         self.validate()
 
     def validate(self):
@@ -569,6 +579,19 @@ class CommandGroup(Base):
                 raise ValueError(msg.format(cmd_idx))
 
         self.nesting = NestingType[self.nesting] if self.nesting else None
+
+        # Check alternate scratch exists
+        if self.alternate_scratch:
+            if not self.alternate_scratch.is_dir():
+                msg = 'Alternate scratch "{}" is not an existing directory.'
+                raise ValueError(msg.format(self.alternate_scratch))
+
+    @property
+    def alternate_scratch(self):
+        if self._alternate_scratch:
+            return Path(self._alternate_scratch)
+        else:
+            return None
 
     @property
     def variable_names(self):
@@ -779,6 +802,7 @@ class Submission(Base):
     id_ = Column('id', Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey('workflow.id'))
     submit_time = Column(DateTime)
+    alt_scratch_dir_name = Column(String(255), nullable=True)
 
     workflow = relationship('Workflow', back_populates='submissions')
     command_group_submissions = relationship(
@@ -799,13 +823,56 @@ class Submission(Base):
 
         self.resolve_variable_values(self.workflow.directory)
         self._scheduler_groups = self.get_scheduler_groups()
-
-        print('self._scheduler_groups:')
-        pprint(self._scheduler_groups)
+        self._make_alternate_scratch_dirs()
 
     @reconstructor
     def init_on_load(self):
         self._scheduler_groups = self.get_scheduler_groups()
+
+    def _make_alternate_scratch_dirs(self):
+
+        if self.workflow.has_alternate_scratch:
+            # Create new directory on alternate scratch for this submission.
+
+            def get_alt_dirname():
+                return ''.join([random.choice('0123456789abcdef') for i in range(10)])
+
+            # Get list of unique alternate scratches:
+            alt_scratches = []
+            for cg in self.workflow.command_groups:
+                if cg.alternate_scratch and cg.alternate_scratch not in alt_scratches:
+                    alt_scratches.append(cg.alternate_scratch)
+
+            # Find a suitable alternate scratch directory name for this submission:
+            count = 0
+            MAX_COUNT = 10
+            alt_dirname = get_alt_dirname()
+            while True:
+                if all([not i.joinpath(alt_dirname).exists() for i in alt_scratches]):
+                    break
+                alt_dirname = get_alt_dirname()
+                count += 1
+                if count > MAX_COUNT:
+                    msg = ('Could not find a suitable alternate scratch directory name '
+                           'in {} iterations.')
+                    raise RuntimeError(msg.format(MAX_COUNT))
+            
+            # Make alternate scratch directories:
+            for i in alt_scratches:
+                for working_dir in self.working_directories:            
+                    alt_scratch_w_dir = i.joinpath(alt_dirname, working_dir.value)
+                    alt_scratch_w_dir.mkdir(parents=True)
+
+            self.alt_scratch_dir_name = alt_dirname
+
+    @property
+    def working_directories(self):
+        dirs = []
+        for cg_sub in self.command_group_submissions:
+            for i in cg_sub.directories:
+                if i not in dirs:
+                    dirs.append(i)
+        return dirs
 
     @property
     def scheduler_groups(self):
@@ -890,10 +957,8 @@ class Submission(Base):
             if i.variable_definition == variable_definition:
                 if directory_var_val:
                     if i.directory_value == directory_var_val:
-                        print(':Sub.is_variable_resolved: {} is resolved.'.format(i))
                         return True
                 else:
-                    print('Sub.is_variable_resolved: {} is resolved.'.format(i))
                     return True
 
         return False
@@ -1190,6 +1255,14 @@ class CommandGroupSubmission(Base):
         'Get the scheduler step size for this command group submission.'
         return self.scheduler_group.step_size[self.scheduler_group_index[1]]
 
+    @property
+    def alternate_scratch_dir(self):
+        if self.command_group.alternate_scratch:
+            return self.command_group.alternate_scratch.joinpath(
+                self.submission.alt_scratch_dir_name)
+        else:
+            return None
+
     def get_var_definition_by_name(self, var_name):
         """"""
 
@@ -1258,20 +1331,44 @@ class CommandGroupSubmission(Base):
         define_dirs = [
             'ROOT_DIR=`pwd`',
             'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
-            'INPUTS_DIR=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
             'LOG_PATH=$SUBMIT_DIR/log_{}.$SGE_TASK_ID'.format(cmd_group.exec_order),
-            'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(self.step_size)
+            'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(self.step_size),
+            'INPUTS_DIR_REL=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
+            'INPUTS_DIR=$ROOT_DIR/$INPUTS_DIR_REL',
         ]
+
+        if self.alternate_scratch_dir:
+            in_dir_scratch = 'INPUTS_DIR_SCRATCH={}/$INPUTS_DIR_REL'.format(
+                self.alternate_scratch_dir)
+            copy_to_alt = [
+                'rsync -av $INPUTS_DIR/ $INPUTS_DIR_SCRATCH >> $LOG_PATH 2>&1',
+                '',
+            ]
+            move_from_alt = [
+                '',
+                ('rsync -av $INPUTS_DIR_SCRATCH/ $INPUTS_DIR --remove-source-files'
+                ' >> $LOG_PATH 2>&1'),
+                '',                
+            ]
+        else:
+            in_dir_scratch = 'INPUTS_DIR_SCRATCH=$INPUTS_DIR'
+            copy_to_alt = []
+            move_from_alt = []
+
+
+        define_dirs.append(in_dir_scratch)
 
         log_stuff = [
             r'touch $LOG_PATH',
             r'printf "Jobscript variables:\n" >> $LOG_PATH 2>&1',
             r'printf "ROOT_DIR:\t ${ROOT_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "SUBMIT_DIR:\t ${SUBMIT_DIR}\n" >> $LOG_PATH 2>&1',
-            r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "LOG_PATH:\t ${LOG_PATH}\n" >> $LOG_PATH 2>&1',
             r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',
             r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
+            r'printf "INPUTS_DIR_REL:\t ${INPUTS_DIR_REL}\n" >> $LOG_PATH 2>&1',
+            r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
+            r'printf "INPUTS_DIR_SCRATCH:\t ${INPUTS_DIR_SCRATCH}\n" >> $LOG_PATH 2>&1',
             r'printf "\n" >> $LOG_PATH 2>&1',
         ]
 
@@ -1285,7 +1382,7 @@ class CommandGroupSubmission(Base):
         cmd_exec = [
             'hpcflow set-task-start {}'.format(set_task_args),
             '',
-            'cd $INPUTS_DIR',
+            'cd $INPUTS_DIR_SCRATCH',
             '. $SUBMIT_DIR/{}'.format(cmd_fn),
             '',
             'hpcflow set-task-end {}'.format(set_task_args),
@@ -1307,7 +1404,9 @@ class CommandGroupSubmission(Base):
                     log_stuff + [''] +
                     write_cmd_exec + [''] +
                     loads + [''] +
+                    copy_to_alt + 
                     cmd_exec +
+                    move_from_alt + 
                     arch_lns)
 
         # Write jobscript:
@@ -1384,9 +1483,6 @@ class CommandGroupSubmission(Base):
             raise ValueError(msg)
 
         var_vals = self.get_variable_values_normed()
-        print('CGS._write_runtime_files: var_vals')
-        pprint(var_vals)
-
         sub_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(sub.workflow.id_), 'submit_{}'.format(sub.id_))
 
