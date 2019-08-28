@@ -1637,7 +1637,7 @@ class Task(Base):
 
     command_group_submission = relationship(
         'CommandGroupSubmission', back_populates='tasks', uselist=False)
-    
+
     archived_task = relationship('Task', uselist=False, remote_side=id_)
 
     def __init__(self, command_group_submission, order_id):
@@ -1686,7 +1686,7 @@ class Task(Base):
     def archive_start_time(self):
         if self.archived_task:
             # Archive for this task was handled by another task with the same working dir:
-            return self.archived_task.archive_start_time            
+            return self.archived_task.archive_start_time
         else:
             return self._archive_start_time
 
@@ -1711,7 +1711,7 @@ class Task(Base):
         if self.archive_start_time and self.archive_end_time:
             return self.archive_end_time - self.archive_start_time
         else:
-            return None        
+            return None
 
     def get_working_directory(self):
         'Get the "working directory" of this task.'
@@ -1748,7 +1748,7 @@ class Task(Base):
 
             if self.duration:
                 out['duration'] = format_time_delta(out['duration'])
-            
+
             if self.archive_duration:
                 out['archive_duration'] = format_time_delta(out['archive_duration'])
 
@@ -1764,7 +1764,7 @@ class Task(Base):
                 out['archive_start_time'] = out['archive_start_time'].strftime(dt_fmt)
 
             if self.archive_end_time:
-                out['archive_end_time'] = out['archive_end_time'].strftime(dt_fmt)                
+                out['archive_end_time'] = out['archive_end_time'].strftime(dt_fmt)
 
             if self.archive_status:
                 out['archive_status'] = self.archive_status.value
