@@ -127,6 +127,10 @@ Here is a list of `hpcflow` (sub-)commands. Type `<command> --help` to show the 
 - Invoking any of these commands should therefore set up the relevant database connection.
 - Only `hpcflow make` and `hpcflow submit` may invoke the `create_all(engine)` method, all other commands should fail if no database exists.
 
+## Other notes:
+
+If using Dropbox archiving, make sure, if necessary, a proxy is correctly configured to allow the machine to communicate with the outside world.
+
 ## Database schema
 
 Here is a [link](https://app.sqldbm.com/MySQL/Share/zcKfw4XqIlAxd5gBe-VZtEGFrngIE8md_DYjF4jNYw0) to view the local SQLite database schema using the `sqldbm.com` web app.
