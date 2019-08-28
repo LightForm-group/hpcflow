@@ -96,8 +96,29 @@ class Archive(Base):
     def path(self):
         return Path(self._path)
 
+    def get_directories(self):
+        """Get sub directories currently on the archive path.
+
+        Returns
+        -------
+        list of str
+            Sub-directory names.
+
+        """
+
+        if not self.host:
+            if self.cloud_provider != CloudProvider.null:
+                directories = self.cloud_provider.get_directories(self.path)
+            else:
+                directories = [i.name for i in self.path.glob('*') if i.is_dir()]
+        else:
+            raise NotImplementedError()
+
+        return directories
+
     def check_exists(self, directory):
         'Check if a given directory exists on the Archive.'
+        print('hpcflow.archive.archive.Archive.check_exists', flush=True)
         if not self.host:
             if self.cloud_provider != CloudProvider.null:
                 exists = self.cloud_provider.check_exists(directory)
@@ -118,12 +139,12 @@ class Archive(Base):
             elif self.root_directory_name == RootDirectoryName.datetime:
                 archive_dir = time.strftime('%Y-%m-%d-%H%M')
 
-            if self.check_exists(self.path.joinpath(archive_dir)):
-
+            sub_dirs = self.get_directories()
+            if archive_dir in sub_dirs:
                 if self.root_directory_increment:
                     count = 0
                     max_count = 10
-                    while self.check_exists(self.path.joinpath(archive_dir)):
+                    while archive_dir in sub_dirs:
                         count += 1
                         if count > max_count:
                             msg = ('Maximum iteration reached ({}) in searching for '
