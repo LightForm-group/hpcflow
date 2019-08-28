@@ -37,6 +37,7 @@ CMD_GROUP_KEYS_REQ = [
 ]
 
 CMD_GROUP_KEYS_GOOD = CMD_GROUP_KEYS_REQ + [
+    'alternate_scratch',
     'archive',
     'archive_excludes',
     'directory',
