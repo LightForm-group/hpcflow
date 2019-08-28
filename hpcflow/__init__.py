@@ -10,8 +10,13 @@ from hpcflow._version import __version__
 PKG_DATA_DIR = Path(__file__).parent.joinpath('data')
 
 DATA_DIR = Path(os.getenv('HPCFLOW_DATA_DIR', '~/.hpcflow')).expanduser()
-DATA_DIR.mkdir(exist_ok=True)
 PROFILES_DIR = DATA_DIR.joinpath('profiles')
+PROJECTS_DB_DIR = DATA_DIR.joinpath('projects')
+
+DATA_DIR.mkdir(exist_ok=True)
+PROJECTS_DB_DIR.mkdir(exist_ok=True)
+
+DB_URI = 'sqlite:///{}/workflows.db'
 
 _CONFIG_PATH = DATA_DIR.joinpath('_config.yml')
 if not _CONFIG_PATH.is_file():
