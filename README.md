@@ -129,7 +129,8 @@ Here is a list of `hpcflow` (sub-)commands. Type `<command> --help` to show the 
 
 ## Other notes:
 
-If using Dropbox archiving, make sure, if necessary, a proxy is correctly configured to allow the machine to communicate with the outside world.
+- If using Dropbox archiving, make sure, if necessary, a proxy is correctly configured to allow the machine to communicate with the outside world.
+- If using Windows, Windows must be at least version 1703, and switched to "Developer mode" (reason is creating a symlink; this could be disabled, but we also need developer mode for WSL I think.)
 
 ## Database schema
 
