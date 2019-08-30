@@ -1579,7 +1579,10 @@ class CommandGroupSubmission(Base):
         delims = CONFIG['variable_delimiters']
         lns_cmd = []
         for i in self.command_group.commands:
-            cmd_ln = '\t'
+            if self.command_group.variable_definitions:
+                cmd_ln = '\t'
+            else:
+                cmd_ln = ''
             is_parallel = 'pe' in self.command_group.scheduler_options
             if is_parallel:
                 cmd_ln += 'mpirun -np $NSLOTS '
@@ -1619,13 +1622,17 @@ class CommandGroupSubmission(Base):
 
             lns_fds.append('\t{}< {}'.format(fd_idx, var_file_path))
 
-        cmd_lns = (about_msg + [''] +
-                   lns_task_id_pad + [''] +
-                   lns_while_start + [''] +
-                   lns_read + [''] +
-                   lns_cmd + [''] +
-                   lns_while_end +
-                   lns_fds + [''])
+        
+        if self.command_group.variable_definitions:
+            cmd_lns = (about_msg + [''] +
+                    lns_task_id_pad + [''] +
+                    lns_while_start + [''] +
+                    lns_read + [''] +
+                    lns_cmd + [''] +
+                    lns_while_end +
+                    lns_fds + [''])
+        else:
+            cmd_lns = (about_msg + [''] + lns_cmd + [''])
 
         cmd_lns = '\n'.join(cmd_lns)
 
