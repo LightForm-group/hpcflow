@@ -1622,15 +1622,14 @@ class CommandGroupSubmission(Base):
 
             lns_fds.append('\t{}< {}'.format(fd_idx, var_file_path))
 
-        
         if self.command_group.variable_definitions:
             cmd_lns = (about_msg + [''] +
-                    lns_task_id_pad + [''] +
-                    lns_while_start + [''] +
-                    lns_read + [''] +
-                    lns_cmd + [''] +
-                    lns_while_end +
-                    lns_fds + [''])
+                       lns_task_id_pad + [''] +
+                       lns_while_start + [''] +
+                       lns_read + [''] +
+                       lns_cmd + [''] +
+                       lns_while_end +
+                       lns_fds + [''])
         else:
             cmd_lns = (about_msg + [''] + lns_cmd + [''])
 
