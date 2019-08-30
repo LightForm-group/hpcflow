@@ -15,7 +15,7 @@ from sqlalchemy import (Column, Integer, DateTime, JSON, ForeignKey, Boolean,
 from sqlalchemy.orm import relationship, deferred, Session, reconstructor
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from hpcflow import CONFIG
+from hpcflow import CONFIG, FILE_NAMES
 from hpcflow._version import __version__
 from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
@@ -84,8 +84,8 @@ class Workflow(Base):
         root_archive_excludes : list of str
             File patterns to exclude from the root archive.
         profile_files : list of Path, optional
-            If specified, the list of paths to the profile files used to generate this
-            workflow.
+            If specified, the list of absolute file paths to the profile files used to
+            generate this workflow.
 
         """
 
@@ -121,8 +121,8 @@ class Workflow(Base):
                 }
             })
 
-        self.profile_files = profile_files
         self._directory = str(directory)
+        self.profile_files = [i.relative_to(self.directory) for i in profile_files]
         self.create_time = datetime.now()
         self.pre_commands = pre_commands
         self.variable_definitions = [
@@ -199,15 +199,15 @@ class Workflow(Base):
 
     @property
     def profile_files(self):
-        if self._profile_files:        
+        if self._profile_files:
             return [Path(i) for i in self._profile_files]
         else:
-            return None
+            return []
 
     @profile_files.setter
     def profile_files(self, profile_files):
         if profile_files:
-            self._profile_files = [str(i) for i in profile_files]        
+            self._profile_files = [str(i) for i in profile_files]
 
     @property
     def has_alternate_scratch(self):
@@ -312,59 +312,12 @@ class Workflow(Base):
 
         """
 
-        sub = Submission(self)
-        submit_dir = sub.write_submit_dirs(self.id_, project.hf_dir)
+        submission = Submission(self)  # Generate CGSs and Tasks
+        submission.write_submit_dirs(project.hf_dir)
+        js_paths = submission.write_jobscripts(project.hf_dir)
+        submission.submit_jobscripts(js_paths)
 
-        # Write a jobscript for each command group submission:
-        js_paths = []
-        for cg_sub in sub.command_group_submissions:
-
-            for task_num in range(cg_sub.num_outputs):
-                Task(cg_sub, task_num)
-
-            js_path_i = cg_sub.write_jobscript(dir_path=submit_dir)
-            js_paths.append(js_path_i)
-
-        self._submit_jobscripts(sub, js_paths)
-
-        return sub
-
-    def _submit_jobscripts(self, submission, jobscript_paths):
-
-        sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
-
-        last_submit_id = None
-        for js_path, cg_sub in zip(jobscript_paths, submission.command_group_submissions):
-
-            qsub_cmd = [sumbit_cmd]
-
-            if last_submit_id:
-                # Add conditional submission:
-                if cg_sub.command_group.nesting == NestingType('hold'):
-                    hold_arg = '-hold_jid'
-                else:
-                    hold_arg = '-hold_jid_ad'
-
-                qsub_cmd += [hold_arg, last_submit_id]
-
-            qsub_cmd.append(str(js_path))
-
-            proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
-            qsub_out = proc.stdout.decode()
-            print(qsub_out, flush=True)
-
-            # Extract newly submitted job ID:
-            pattern = r'[0-9]+'
-            job_id_search = re.search(pattern, qsub_out)
-            try:
-                job_id_str = job_id_search.group()
-            except AttributeError:
-                msg = ('Could not retrieve the job ID from the submitted jobscript found '
-                       'at {}. No more jobscripts will be submitted.')
-                raise ValueError(msg.format(js_path))
-
-            cg_sub.scheduler_job_id = int(job_id_str)
-            last_submit_id = job_id_str
+        return submission
 
     def get_num_channels(self, exec_order=0):
         """Get the number of command groups with a given execution order.
@@ -846,6 +799,7 @@ class Submission(Base):
     __tablename__ = 'submission'
 
     id_ = Column('id', Integer, primary_key=True)
+    order_id = Column(Integer)
     workflow_id = Column(Integer, ForeignKey('workflow.id'))
     submit_time = Column(DateTime)
     alt_scratch_dir_name = Column(String(255), nullable=True)
@@ -862,14 +816,23 @@ class Submission(Base):
     def __init__(self, workflow):
 
         self.submit_time = datetime.now()
+        self.order_id = len(workflow.submissions)
         self.workflow = workflow
 
         for i in self.workflow.command_groups:
             CommandGroupSubmission(i, self)
 
         self.resolve_variable_values(self.workflow.directory)
+
+        # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
+        # `resolve_variable_values`:
         self._scheduler_groups = self.get_scheduler_groups()
         self._make_alternate_scratch_dirs()
+
+        # `Task`s must be generated after `SchedulerGroup`s:
+        for cg_sub in self.command_group_submissions:
+            for task_num in range(cg_sub.num_outputs):
+                Task(cg_sub, task_num)
 
     @reconstructor
     def init_on_load(self):
@@ -1052,14 +1015,14 @@ class Submission(Base):
                             VarValue(val, val_idx, var_defn, self, directory_value=j)
                             session.commit()
 
-    def write_submit_dirs(self, workflow_id, hf_dir):
+    def write_submit_dirs(self, hf_dir):
         """Write the directory structure necessary for this submission."""
 
-        wf_path = hf_dir.joinpath('workflow_{}'.format(workflow_id))
+        wf_path = hf_dir.joinpath('workflow_{}'.format(self.workflow_id))
         if not wf_path.exists():
             wf_path.mkdir()
 
-        submit_path = wf_path.joinpath('submit_{}'.format(self.id_))
+        submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         submit_path.mkdir()
 
         for idx, i in enumerate(self.scheduler_groups):
@@ -1093,7 +1056,84 @@ class Submission(Base):
                 vv_j_path = var_values_path.joinpath(j_fmt)
                 vv_j_path.mkdir()
 
-        return submit_path
+        if self.workflow.has_alternate_scratch:
+
+            excluded_paths = [
+                Path(CONFIG['hpcflow_directory'])] + self.workflow.profile_files
+
+            working_dir_paths = [Path(i.value) for i in self.working_directories]
+
+            alt_scratch_exclusions = {i: [] for i in working_dir_paths}
+            for working_dir in working_dir_paths:
+                for exc_path in excluded_paths:
+                    try:
+                        exc_path.relative_to(working_dir)
+                        alt_scratch_exclusions[working_dir].append(exc_path)
+                    except ValueError:
+                        continue
+
+            for cg_sub_idx, cg_sub in enumerate(self.command_group_submissions):
+                if cg_sub.command_group.alternate_scratch:
+                    for task in cg_sub.tasks:
+                        exc_list_path = submit_path.joinpath(
+                            '{}_{}_{}{}'.format(
+                                FILE_NAMES['alt_scratch_exc_file'],
+                                cg_sub.command_group_exec_order,
+                                task.order_id,
+                                FILE_NAMES['alt_scratch_exc_file_ext'],
+                            )
+                        )
+                        working_dir = Path(task.get_working_directory_value())
+                        with exc_list_path.open('w') as handle:
+                            for exc_path in alt_scratch_exclusions[working_dir]:
+                                handle.write(str(exc_path) + '\n')
+
+    def write_jobscripts(self, hf_dir):
+
+        wf_path = hf_dir.joinpath('workflow_{}'.format(self.workflow_id))
+        submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
+        js_paths = []
+        for cg_sub in self.command_group_submissions:
+            js_path_i = cg_sub.write_jobscript(dir_path=submit_path)
+            js_paths.append(js_path_i)
+
+        return js_paths
+
+    def submit_jobscripts(self, jobscript_paths):
+
+        sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
+        last_submit_id = None
+        for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
+
+            qsub_cmd = [sumbit_cmd]
+
+            if last_submit_id:
+                # Add conditional submission:
+                if cg_sub.command_group.nesting == NestingType('hold'):
+                    hold_arg = '-hold_jid'
+                else:
+                    hold_arg = '-hold_jid_ad'
+
+                qsub_cmd += [hold_arg, last_submit_id]
+
+            qsub_cmd.append(str(js_path))
+
+            proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
+            qsub_out = proc.stdout.decode()
+            print(qsub_out, flush=True)
+
+            # Extract newly submitted job ID:
+            pattern = r'[0-9]+'
+            job_id_search = re.search(pattern, qsub_out)
+            try:
+                job_id_str = job_id_search.group()
+            except AttributeError:
+                msg = ('Could not retrieve the job ID from the submitted jobscript found '
+                       'at {}. No more jobscripts will be submitted.')
+                raise ValueError(msg.format(js_path))
+
+            cg_sub.scheduler_job_id = int(job_id_str)
+            last_submit_id = job_id_str
 
     def get_stats(self, jsonable=True):
         'Get task statistics for this submission.'
@@ -1384,16 +1424,22 @@ class CommandGroupSubmission(Base):
         ]
 
         if self.alternate_scratch_dir:
+            alt_scratch_exc_path = '$SUBMIT_DIR/{}_{}_$TASK_IDX{}'.format(
+                FILE_NAMES['alt_scratch_exc_file'],
+                self.command_group_exec_order,
+                FILE_NAMES['alt_scratch_exc_file_ext'],
+            )
+            define_dirs.append('ALT_SCRATCH_EXC=' + alt_scratch_exc_path)
             in_dir_scratch = 'INPUTS_DIR_SCRATCH={}/$INPUTS_DIR_REL'.format(
                 self.alternate_scratch_dir)
             copy_to_alt = [
-                ('rsync -av --exclude={} $INPUTS_DIR/ $INPUTS_DIR_SCRATCH '
-                 '>> $LOG_PATH 2>&1').format(CONFIG['hpcflow_directory']),
+                ('rsync -avviz --exclude-from="${ALT_SCRATCH_EXC}" '
+                 '$INPUTS_DIR/ $INPUTS_DIR_SCRATCH >> $LOG_PATH 2>&1'),
                 '',
             ]
             move_from_alt = [
                 '',
-                ('rsync -av $INPUTS_DIR_SCRATCH/ $INPUTS_DIR --remove-source-files'
+                ('rsync -avviz $INPUTS_DIR_SCRATCH/ $INPUTS_DIR --remove-source-files'
                  ' >> $LOG_PATH 2>&1'),
                 '',
             ]
@@ -1415,8 +1461,14 @@ class CommandGroupSubmission(Base):
             r'printf "INPUTS_DIR_REL:\t ${INPUTS_DIR_REL}\n" >> $LOG_PATH 2>&1',
             r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "INPUTS_DIR_SCRATCH:\t ${INPUTS_DIR_SCRATCH}\n" >> $LOG_PATH 2>&1',
-            r'printf "\n" >> $LOG_PATH 2>&1',
         ]
+
+        if self.alternate_scratch_dir:
+            log_stuff.append(
+                r'printf "ALT_SCRATCH_EXC:\t ${ALT_SCRATCH_EXC}\n" >> $LOG_PATH 2>&1',
+            )
+
+        log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
 
         write_cmd_exec = [
             ('hpcflow write-cmd -d $ROOT_DIR {0:} >> $LOG_PATH 2>&1').format(self.id_),
@@ -1534,7 +1586,7 @@ class CommandGroupSubmission(Base):
 
         var_vals = self.get_variable_values_normed()
         sub_dir = project.hf_dir.joinpath(
-            'workflow_{}'.format(sub.workflow.id_), 'submit_{}'.format(sub.id_))
+            'workflow_{}'.format(sub.workflow.id_), 'submit_{}'.format(sub.order_id))
 
         sch_group_dir = sub_dir.joinpath(
             'scheduler_group_{}'.format(self.scheduler_group_index[0]))
