@@ -88,7 +88,7 @@ class Workflow(Base):
         # Command group directories must be stored internally as variables:
         for idx, i in enumerate(command_groups):
 
-            dir_var_value = '{}'
+            dir_var_value = '.'
 
             if 'directory' in i:
 
@@ -1306,16 +1306,19 @@ class CommandGroupSubmission(Base):
             var_length = i.get_multiplicity(self.submission)
             task_multi_all.update({i.name: var_length})
 
-        uniq_lens = set(task_multi_all.values())
-        num_uniq_lens = len(uniq_lens)
-        if num_uniq_lens == 1:
-            task_multi = min(uniq_lens)
-        elif num_uniq_lens == 2:
-            if min(uniq_lens) != 1:
-                raise ValueError('bad 4!')
-            task_multi = max(uniq_lens)
+        if task_multi_all:
+            uniq_lens = set(task_multi_all.values())
+            num_uniq_lens = len(uniq_lens)
+            if num_uniq_lens == 1:
+                task_multi = min(uniq_lens)
+            elif num_uniq_lens == 2:
+                if min(uniq_lens) != 1:
+                    raise ValueError('bad 4!')
+                task_multi = max(uniq_lens)
+            else:
+                raise ValueError('bad 5!')
         else:
-            raise ValueError('bad 5!')
+            task_multi = 1
 
         return task_multi
 
