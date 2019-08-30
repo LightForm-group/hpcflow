@@ -64,7 +64,7 @@ def get_all_var_defns_from_lookup(scope):
 
     """
 
-    all_scoped_vars = VARS_LOOKUP['scopes'][scope]
+    all_scoped_vars = VARS_LOOKUP['scopes'][scope or '_default']
     scoped_vars = all_scoped_vars.get('variables', {})
     scoped_vars_template = all_scoped_vars.get('variables_from_template', {})
 
