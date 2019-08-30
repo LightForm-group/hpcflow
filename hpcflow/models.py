@@ -1371,7 +1371,8 @@ class CommandGroupSubmission(Base):
             in_dir_scratch = 'INPUTS_DIR_SCRATCH={}/$INPUTS_DIR_REL'.format(
                 self.alternate_scratch_dir)
             copy_to_alt = [
-                'rsync -av $INPUTS_DIR/ $INPUTS_DIR_SCRATCH >> $LOG_PATH 2>&1',
+                ('rsync -av --exclude={} $INPUTS_DIR/ $INPUTS_DIR_SCRATCH '
+                 '>> $LOG_PATH 2>&1').format(CONFIG['hpcflow_directory']),
                 '',
             ]
             move_from_alt = [
