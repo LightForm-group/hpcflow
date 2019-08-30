@@ -1373,7 +1373,11 @@ class CommandGroupSubmission(Base):
             ('hpcflow write-cmd -d $ROOT_DIR {0:} >> $LOG_PATH 2>&1').format(self.id_),
         ]
 
-        loads = ['module load {}'.format(i) for i in sorted(cmd_group.modules)]
+        if cmd_group.modules:
+            loads = [''] + [
+                'module load {}'.format(i) for i in sorted(cmd_group.modules)] + ['']
+        else:
+            loads = []
 
         set_task_args = '-d $ROOT_DIR -t $TASK_IDX {} >> $LOG_PATH 2>&1'.format(self.id_)
         cmd_exec = [
