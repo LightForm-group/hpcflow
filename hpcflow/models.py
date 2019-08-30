@@ -883,10 +883,10 @@ class Submission(Base):
                     msg = ('Could not find a suitable alternate scratch directory name '
                            'in {} iterations.')
                     raise RuntimeError(msg.format(MAX_COUNT))
-            
+
             # Make alternate scratch directories:
             for i in alt_scratches:
-                for working_dir in self.working_directories:            
+                for working_dir in self.working_directories:
                     alt_scratch_w_dir = i.joinpath(alt_dirname, working_dir.value)
                     alt_scratch_w_dir.mkdir(parents=True)
 
