@@ -6,13 +6,12 @@ from sqlalchemy.orm import sessionmaker
 from hpcflow import base_db
 
 
-def init_db(db_uri, check_exists=True):
+def init_db(project, check_exists=True):
     """Get database Session.
 
     Parameters
     ----------
-    db_uri : str
-        URI of the sqlite database.
+    project : Project
     check_exists : bool
         If True, an exception is raised if the database does not exist. Default
         is True. This allows us to distinguish between commands that require
@@ -21,7 +20,7 @@ def init_db(db_uri, check_exists=True):
 
     """
 
-    engine = create_engine(db_uri, echo=False)
+    engine = create_engine(project.db_uri, echo=False)
 
     if check_exists:
         try:
@@ -32,6 +31,7 @@ def init_db(db_uri, check_exists=True):
     # Ensure models are represented in the database (`hpcflow.models` must be
     # in-scope):
     base_db.Base.metadata.create_all(engine)
+    project.ensure_db_symlink()
     Session = sessionmaker(bind=engine)
 
     return Session

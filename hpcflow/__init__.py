@@ -16,7 +16,7 @@ PROJECTS_DB_DIR = DATA_DIR.joinpath('projects')
 DATA_DIR.mkdir(exist_ok=True)
 PROJECTS_DB_DIR.mkdir(exist_ok=True)
 
-DB_URI = 'sqlite:///{}/workflows.db'
+DB_NAME = 'workflows.db'
 
 _CONFIG_PATH = DATA_DIR.joinpath('_config.yml')
 if not _CONFIG_PATH.is_file():

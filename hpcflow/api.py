@@ -74,7 +74,7 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         # Get workflow from YAML profiles:
         workflow_dict = parse_job_profiles(project.dir_path, profile_list)
 
-    Session = init_db(project.db_uri, check_exists=False)
+    Session = init_db(project, check_exists=False)
     session = Session()
 
     workflow = Workflow(directory=project.dir_path, **workflow_dict)
@@ -107,7 +107,7 @@ def submit_workflow(workflow_id, dir_path=None, task_ranges=None):
     """
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     workflow = session.query(Workflow).get(workflow_id)
@@ -138,7 +138,7 @@ def get_workflow_ids(dir_path=None):
     """
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     workflow_ids = [i.id_ for i in session.query(Workflow.id_)]
@@ -171,7 +171,7 @@ def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
 
     """
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
@@ -184,7 +184,7 @@ def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
 def set_task_start(cmd_group_sub_id, task_idx, dir_path=None):
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
@@ -197,7 +197,7 @@ def set_task_start(cmd_group_sub_id, task_idx, dir_path=None):
 def set_task_end(cmd_group_sub_id, task_idx, dir_path=None):
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
@@ -225,7 +225,7 @@ def archive(cmd_group_sub_id, task_idx, dir_path=None):
     """
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
@@ -239,7 +239,7 @@ def root_archive(workflow_id, dir_path=None):
     """Archive the root directory of the Workflow."""
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     workflow = session.query(Workflow).get(workflow_id)
@@ -253,7 +253,7 @@ def get_stats(dir_path=None, workflow_id=None, jsonable=True):
     'Get task statistics (as a JSON-like dict) for a project.'
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     all_workflow_ids = [i.id_ for i in session.query(Workflow.id_)]
@@ -351,7 +351,7 @@ def kill(dir_path=None, workflow_id=None):
     'Delete jobscripts associated with a given workflow.'
 
     project = Project(dir_path)
-    Session = init_db(project.db_uri, check_exists=True)
+    Session = init_db(project, check_exists=True)
     session = Session()
 
     all_workflow_ids = [i.id_ for i in session.query(Workflow.id_)]
