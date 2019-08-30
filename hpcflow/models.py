@@ -41,6 +41,7 @@ class Workflow(Base):
     root_archive_id = Column(Integer, ForeignKey('archive.id'), nullable=True)
     root_archive_excludes = Column(JSON, nullable=True)
     root_archive_directory = Column(String(255), nullable=True)
+    _profile_files = Column('profile_files', JSON, nullable=True)
 
     command_groups = relationship(
         'CommandGroup',
@@ -53,7 +54,7 @@ class Workflow(Base):
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
-                 root_archive_excludes=None):
+                 root_archive_excludes=None, profile_files=None):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -82,6 +83,9 @@ class Workflow(Base):
             Index into `archives` that sets the root archive for the workflow.
         root_archive_excludes : list of str
             File patterns to exclude from the root archive.
+        profile_files : list of Path, optional
+            If specified, the list of paths to the profile files used to generate this
+            workflow.
 
         """
 
@@ -117,6 +121,7 @@ class Workflow(Base):
                 }
             })
 
+        self.profile_files = profile_files
         self._directory = str(directory)
         self.create_time = datetime.now()
         self.pre_commands = pre_commands
@@ -191,6 +196,18 @@ class Workflow(Base):
         msg = ('Cannot find variable definition with '
                'name "{}"'.format(variable_name))
         raise ValueError(msg)
+
+    @property
+    def profile_files(self):
+        if self._profile_files:        
+            return [Path(i) for i in self._profile_files]
+        else:
+            return None
+
+    @profile_files.setter
+    def profile_files(self, profile_files):
+        if profile_files:
+            self._profile_files = [str(i) for i in profile_files]        
 
     @property
     def has_alternate_scratch(self):

@@ -197,7 +197,8 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         'pre_commands': pre_commands,
         'archives': archives,
         'root_archive_idx': root_arch_idx,
-        'root_archive_excludes': root_arch_exc
+        'root_archive_excludes': root_arch_exc,
+        'profile_files': list(profile_matches.keys()),
     }
 
     return workflow
