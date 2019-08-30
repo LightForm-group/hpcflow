@@ -1058,6 +1058,7 @@ class Submission(Base):
 
         if self.workflow.has_alternate_scratch:
 
+            # List of Paths to exclude, relative to `self.workflow.directory`:
             excluded_paths = [
                 Path(CONFIG['hpcflow_directory'])] + self.workflow.profile_files
 
