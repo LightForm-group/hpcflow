@@ -165,6 +165,22 @@ class Workflow(Base):
         self._execute_pre_commands()
         self.do_root_archive()
 
+    def __repr__(self):
+        out = ('{}('
+               'id={}, '
+               'directory={}, '
+               'pre_commands={}, '
+               'root_archive_id={}'
+               ')').format(
+            self.__class__.__name__,
+            self.id_,
+            self.directory,
+            self.pre_commands,
+            self.root_archive_id,
+        )
+
+        return out
+
     def get_variable_definition_by_name(self, variable_name):
         """Get the VarDefintion object using the variable name."""
 
@@ -679,6 +695,21 @@ class VarDefinition(Base):
         back_populates='variable_definition',
         order_by='VarValue.order_id',
     )
+
+    def __repr__(self):
+        out = ('{}('
+               'name={!r}, '
+               'data={!r}, '
+               'file_regex={!r}, '
+               'value={!r}'
+               ')').format(
+                   self.__class__.__name__,
+                   self.name,
+                   self.data,
+                   self.file_regex,
+                   self.value,
+        )
+        return out
 
     def __init__(self, name, data=None, file_regex=None, value=None):
 
