@@ -1349,7 +1349,6 @@ class CommandGroupSubmission(Base):
 
         cmd_name = 'cmd_{}'.format(self.command_group_exec_order)
         cmd_fn = cmd_name + js_ext
-        cmd_path = dir_path.joinpath(cmd_fn)
 
         submit_dir_relative = dir_path.relative_to(
             self.submission.workflow.directory).as_posix()
