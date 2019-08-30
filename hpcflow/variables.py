@@ -13,45 +13,6 @@ class UnresolvedVariableError(Exception):
     pass
 
 
-def get_var_defn_from_lookup(var_name, scope):
-    """Return the variable definition from the variable lookup file.
-
-    Parameters
-    ----------
-    var_name : str
-        Name of the variable definition
-    scope : str
-        Scope within the variable lookup file in which the variable definition
-        resides.
-
-    Returns
-    -------
-    var_defn : dict
-        Variable definition dictionary.
-
-    """
-
-    all_scoped_vars = VARS_LOOKUP['scopes'][scope]
-    scoped_vars = all_scoped_vars.get('variables', {})
-    scoped_vars_template = all_scoped_vars.get('variables_from_template', {})
-
-    if var_name in scoped_vars:
-        var_defn = scoped_vars[var_name]
-
-    elif var_name in scoped_vars_template:
-        # Construct the variable definition from a template
-        template_name, template_arg = scoped_vars_template[var_name]
-        template = VARS_LOOKUP['variable_templates'][template_name]
-        var_defn = get_var_defn_from_template(template, template_arg)
-
-    else:
-        msg = ('Variable named "{}" could not be found in the variable '
-               'lookup file')
-        raise ValueError(msg.format(var_name))
-
-    return var_defn
-
-
 def get_var_defn_from_template(template, arg):
     """Construct a variable from a template and an argument.
 
