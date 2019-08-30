@@ -86,7 +86,6 @@ class Workflow(Base):
         """
 
         # Command group directories must be stored internally as variables:
-        cmd_group_dir_vars = []
         for idx, i in enumerate(command_groups):
 
             dir_var_value = '{}'
