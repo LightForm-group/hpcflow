@@ -1374,14 +1374,13 @@ class CommandGroupSubmission(Base):
             move_from_alt = [
                 '',
                 ('rsync -av $INPUTS_DIR_SCRATCH/ $INPUTS_DIR --remove-source-files'
-                ' >> $LOG_PATH 2>&1'),
-                '',                
+                 ' >> $LOG_PATH 2>&1'),
+                '',
             ]
         else:
             in_dir_scratch = 'INPUTS_DIR_SCRATCH=$INPUTS_DIR'
             copy_to_alt = []
             move_from_alt = []
-
 
         define_dirs.append(in_dir_scratch)
 
@@ -1435,9 +1434,9 @@ class CommandGroupSubmission(Base):
                     log_stuff + [''] +
                     write_cmd_exec + [''] +
                     loads + [''] +
-                    copy_to_alt + 
+                    copy_to_alt +
                     cmd_exec +
-                    move_from_alt + 
+                    move_from_alt +
                     arch_lns)
 
         # Write jobscript:
