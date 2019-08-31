@@ -1268,8 +1268,6 @@ class CommandGroupSubmission(Base):
                    ' submission; cannot get normed variable values.')
             raise ValueError(msg)
 
-        all_var_vals_dat = []
-
         var_vals_dat_ii = {}
         for i in self.command_group.variable_definitions:
 
