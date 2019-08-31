@@ -35,6 +35,6 @@ with _VARS_LOOKUP_PATH.open('r') as handle:
     VARS_LOOKUP = yaml.safe_load(handle)
 
 FILE_NAMES = {
-    'alt_scratch_exc_file': 'as_exclude',
+    'alt_scratch_exc_file': 'alt_scratch_exclude',
     'alt_scratch_exc_file_ext': '.txt',
 }

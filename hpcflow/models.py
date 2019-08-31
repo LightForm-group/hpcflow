@@ -1140,8 +1140,9 @@ class Submission(Base):
                         working_dir = Path(task.get_working_directory_value())
                         working_dir_abs = self.workflow.directory.joinpath(working_dir)
                         about = (
-                            '# --- `rsync` exclusion list for alternate scratch ---\n '
-                            '# --- written relative to task #{} working directory: "{}"\n'
+                            '# Alternate scratch exclusion list. Patterns are relative '
+                            'to task #{} working directory:\n'
+                            '#   "{}"\n\n'
                         )
                         with exc_list_path.open('w') as handle:
                             handle.write(about.format(task.order_id, working_dir_abs))
