@@ -1318,7 +1318,7 @@ class CommandGroupSubmission(Base):
                     var_vals_normed['vals'].update({j: k})
 
                 var_vals_normed_all.append(var_vals_normed)
-        print('CGS.get_variable_values_normed: {}'.format(var_vals_normed_all))
+
         return var_vals_normed_all
 
     @property
@@ -1461,8 +1461,15 @@ class CommandGroupSubmission(Base):
 
         return js_path
 
-    def write_runtime_files(self, project):
-        'Write files necessary at command group run time to execute the commands.'
+    def write_runtime_files(self, project, task_idx):
+
+        self.queue_write_command_file(project)
+        self.write_variable_files(project, task_idx)
+
+    def queue_write_command_file(self, project):
+        """Ensure the command file for this command group submission is written, ready
+        to be invoked by the jobscript, and also refresh the resolved variable values
+        so that when the variable files are written, they are up to date."""
 
         session = Session.object_session(self)
 
@@ -1472,73 +1479,58 @@ class CommandGroupSubmission(Base):
                      'seconds'.format(context, sleep_time))
         unblock_msg = ('{{}} {}: Commands not written and writing available. Writing '
                        'command file.'.format(context))
-        written_msg = ('{{}} {}: Command files already written.'.format(context))
+        written_msg = '{{}} {}: Command files already written.'.format(context)
+        refresh_vals_msg = '{{}} {}: Refreshing resolved variable values.'.format(context)
 
-        if not self.commands_written:
+        blocked = True
+        while blocked:
 
-            blocked = True
-            while blocked:
+            session.refresh(self)
 
-                session.refresh(self)
-                if self.commands_written:
-                    print(written_msg.format(datetime.now()), flush=True)
-                    return
+            if self.is_command_writing:
+                print(block_msg.format(datetime.now()), flush=True)
+                sleep(sleep_time)
 
-                if self.is_command_writing:
+            else:
+                try:
+                    self.is_command_writing = IsCommandWriting()
+                    session.commit()
+                    blocked = False
+
+                except IntegrityError:
+                    # Another process has already set `is_command_writing`
+                    session.rollback()
                     print(block_msg.format(datetime.now()), flush=True)
                     sleep(sleep_time)
 
-                else:
-                    try:
-                        self.is_command_writing = IsCommandWriting()
-                        session.commit()
-                        blocked = False
+                except OperationalError:
+                    # Database is likely locked.
+                    session.rollback()
+                    print(block_msg.format(datetime.now()), flush=True)
+                    sleep(sleep_time)
 
-                    except IntegrityError:
-                        # Another process has already set `is_command_writing`
-                        session.rollback()
-                        print(block_msg.format(datetime.now()), flush=True)
-                        sleep(sleep_time)
+                if not blocked:
 
-                    except OperationalError:
-                        # Database is likely locked.
-                        session.rollback()
-                        print(block_msg.format(datetime.now()), flush=True)
-                        sleep(sleep_time)
+                    if not self.commands_written:
+                        print(unblock_msg.format(datetime.now()), flush=True)
+                        self.write_command_file(project)
+                        self.commands_written = True
+                    else:
+                        print(written_msg.format(datetime.now()), flush=True)
 
-                    if not blocked:
+                    print(refresh_vals_msg.format(datetime.now()), flush=True)
+                    self.submission.resolve_variable_values(project.dir_path)
 
-                        if not self.commands_written:
+                    self.is_command_writing = None
+                    session.commit()
 
-                            print(unblock_msg.format(datetime.now()), flush=True)
-                            self._write_runtime_files(project)
-                            self.commands_written = True
-
-                        self.is_command_writing = None
-                        session.commit()
-
-    def _write_runtime_files(self, project):
-        'Write files necessary at command group run time to execute the commands.'
-
-        sub = self.submission
-        sub.resolve_variable_values(project.dir_path)
-
-        if not self.all_variables_resolved:
-            msg = ('Not all variables values have been resolved for this command '
-                   'group; cannot write command files.')
-            raise ValueError(msg)
+    def write_variable_files(self, project, req_task_idx):
 
         var_vals = self.get_variable_values_normed()
-        sub_dir = project.hf_dir.joinpath(
-            'workflow_{}'.format(sub.workflow.id_), 'submit_{}'.format(sub.order_id))
 
-        sch_group_dir = sub_dir.joinpath(
-            'scheduler_group_{}'.format(self.scheduler_group_index[0]))
-
-        self.write_command_file(sub_dir)
-        self.write_variable_files(var_vals, sch_group_dir)
-
-    def write_variable_files(self, var_vals, sch_group_dir):
+        print('CGS.write_variable_files: req_task_idx: {}'.format(req_task_idx), flush=True)
+        print('CGS.write_variable_files: var_vals:', flush=True)
+        pprint(var_vals)
 
         var_group_len = 1 if self.command_group.is_job_array else self.task_multiplicity
 
@@ -1566,23 +1558,31 @@ class CommandGroupSubmission(Base):
 
             task_idx += self.step_size
 
-        print('CGS.write_variable_files')
+        print('CGS.write_variable_files: var_vals_file_dat:')
         pprint(var_vals_file_dat)
+
+        sch_group_dir = project.hf_dir.joinpath(
+            'workflow_{}'.format(self.submission.workflow.id_),
+            'submit_{}'.format(self.submission.order_id),
+            'scheduler_group_{}'.format(self.scheduler_group_index[0]),
+        )
 
         for task_idx, var_vals_file in var_vals_file_dat.items():
 
-            vals_dir_num = zeropad(task_idx + 1, self.scheduler_group.max_num_tasks)
-            var_vals_dir = sch_group_dir.joinpath('var_values', vals_dir_num)
+            if task_idx == req_task_idx:
 
-            for var_name, var_val_all in var_vals_file.items():
-                var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
-                var_file_path = var_vals_dir.joinpath(var_fn)
+                vals_dir_num = zeropad(task_idx + 1, self.scheduler_group.max_num_tasks)
+                var_vals_dir = sch_group_dir.joinpath('var_values', vals_dir_num)
 
-                with var_file_path.open('w') as handle:
-                    for i in var_val_all:
-                        handle.write('{}\n'.format(i))
+                for var_name, var_val_all in var_vals_file.items():
+                    var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
+                    var_file_path = var_vals_dir.joinpath(var_fn)
 
-    def write_command_file(self, dir_path):
+                    with var_file_path.open('w') as handle:
+                        for i in var_val_all:
+                            handle.write('{}\n'.format(i))
+
+    def write_command_file(self, project):
 
         lns_while_start = [
             'while true',
@@ -1648,9 +1648,11 @@ class CommandGroupSubmission(Base):
 
         cmd_lns = '\n'.join(cmd_lns)
 
-        cmd_fn = 'cmd_{}{}'.format(self.command_group_exec_order,
-                                   CONFIG['jobscript_ext'])
-        cmd_path = dir_path.joinpath(cmd_fn)
+        cmd_path = project.hf_dir.joinpath(
+            'workflow_{}'.format(self.submission.workflow.id_),
+            'submit_{}'.format(self.submission.order_id),
+            'cmd_{}{}'.format(self.command_group_exec_order, CONFIG['jobscript_ext']),
+        )
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 

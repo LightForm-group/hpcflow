@@ -155,7 +155,7 @@ def clean(dir_path=None):
     project.clean()
 
 
-def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
+def write_runtime_files(cmd_group_sub_id, task_idx, dir_path=None):
     """Write the commands files for a given command group submission.
 
     Parameters
@@ -163,7 +163,7 @@ def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
     cmd_group_sub_id : int
         ID of the command group submission for which a command file is to be
         generated.
-    task : int, optional
+    task_idx : int, optional
         Task ID. What is this for???
     dir_path : str or Path, optional
         The directory in which the Workflow will be generated. By default, this
@@ -175,7 +175,7 @@ def write_runtime_files(cmd_group_sub_id, task=None, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.write_runtime_files(project)
+    cg_sub.write_runtime_files(project, task_idx)
 
     session.commit()
     session.close()

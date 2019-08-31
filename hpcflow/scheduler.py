@@ -162,10 +162,8 @@ class SunGridEngine(Scheduler):
 
         log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
 
-        write_cmd_exec = [
-            ('hpcflow write-cmd -d $ROOT_DIR {0:} >> $LOG_PATH 2>&1').format(
-                command_group_submission_id),
-        ]
+        write_cmd_exec = [('hpcflow write-runtime-files -d $ROOT_DIR {0:} $TASK_IDX '
+                           '>> $LOG_PATH 2>&1').format(command_group_submission_id)]
 
         if modules:
             loads = [''] + ['module load {}'.format(i) for i in sorted(modules)] + ['']

@@ -154,11 +154,11 @@ def make(directory=None, profiles=None, json_file=None, json=None):
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--task', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
-def write_cmd(cmd_group_sub_id, task=None, directory=None):
-    print('hpcflow.cli.write_cmd', flush=True)
-    api.write_runtime_files(cmd_group_sub_id, task, directory)
+@click.argument('task_idx', type=click.INT)
+def write_runtime_files(cmd_group_sub_id, task_idx, directory=None):
+    print('hpcflow.cli.write_runtime_files', flush=True)
+    api.write_runtime_files(cmd_group_sub_id, task_idx, directory)
 
 
 @cli.command()
