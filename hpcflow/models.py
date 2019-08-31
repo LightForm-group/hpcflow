@@ -1167,6 +1167,7 @@ class Submission(Base):
             qsub_out = proc.stdout.decode().strip()
             qsub_err = proc.stderr.decode().strip()
             print(qsub_out, flush=True)
+            print(qsub_err, flush=True)
 
             # Extract newly submitted job ID:
             pattern = r'[0-9]+'
