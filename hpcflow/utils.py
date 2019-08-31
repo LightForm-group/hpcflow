@@ -71,7 +71,7 @@ def format_time_delta(time_delta):
     hours, hours_rem = divmod(days_rem, 3600)
     mins, seconds = divmod(hours_rem, 60)
 
-    time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, mins, seconds)
+    time_diff_fmt = '{:02.0f}:{:02.0f}:{:02.0f}'.format(hours, mins, round(seconds))
     if days > 0:
         days_str = 'day' if days == 1 else 'days'
         time_diff_fmt = '{} {}, '.format(days, days_str) + time_diff_fmt
