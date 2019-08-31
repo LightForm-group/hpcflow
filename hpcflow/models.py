@@ -1106,6 +1106,15 @@ class Submission(Base):
             excluded_paths = [
                 Path(CONFIG['hpcflow_directory'])] + self.workflow.profile_files
 
+            for cg_sub in self.command_group_submissions:
+                scheduler = cg_sub.command_group.scheduler
+                out_dir = Path(scheduler.output_dir)
+                err_dir = Path(scheduler.error_dir)
+                if out_dir not in excluded_paths:
+                    excluded_paths.append(out_dir)
+                if err_dir not in excluded_paths:
+                    excluded_paths.append(err_dir)
+
             working_dir_paths = [Path(i.value) for i in self.working_directories]
 
             alt_scratch_exclusions = {i: [] for i in working_dir_paths}
