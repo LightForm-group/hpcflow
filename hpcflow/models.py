@@ -1164,7 +1164,8 @@ class Submission(Base):
             qsub_cmd.append(str(js_path))
 
             proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
-            qsub_out = proc.stdout.decode()
+            qsub_out = proc.stdout.decode().strip()
+            qsub_err = proc.stderr.decode().strip()
             print(qsub_out, flush=True)
 
             # Extract newly submitted job ID:
