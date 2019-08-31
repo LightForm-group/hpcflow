@@ -1446,7 +1446,7 @@ class CommandGroupSubmission(Base):
 
         print('self.command_group.scheduler: {}'.format(self.command_group.scheduler))
 
-        self.command_group.scheduler.write_jobscript(
+        js_path = self.command_group.scheduler.write_jobscript(
             dir_path=dir_path,
             workflow_directory=self.submission.workflow.directory,
             command_group_order=self.command_group_exec_order,
@@ -1457,6 +1457,8 @@ class CommandGroupSubmission(Base):
             alternate_scratch_dir=self.alternate_scratch_dir,
             command_group_submission_id=self.id_
         )
+
+        return js_path
 
     def write_runtime_files(self, project):
         'Write files necessary at command group run time to execute the commands.'
@@ -1593,7 +1595,7 @@ class CommandGroupSubmission(Base):
                 cmd_ln = '\t'
             else:
                 cmd_ln = ''
-            is_parallel = 'pe' in self.command_group.scheduler_options
+            is_parallel = 'pe' in self.command_group.scheduler.options
             if is_parallel:
                 cmd_ln += 'mpirun -np $NSLOTS '
             cmd_ln += i.replace(delims[0], '${').replace(delims[1], '}')
