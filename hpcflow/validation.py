@@ -7,7 +7,9 @@ constructing `Workflow` and `CommandGroup` instances.
 
 """
 
+from hpcflow import CONFIG
 from hpcflow.nesting import NestingType
+
 
 PROFILE_KEYS_REQ = [
     'command_groups',
@@ -24,7 +26,10 @@ PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
     'is_job_array',
     'modules',
     'nesting',
+    'scheduler',
     'scheduler_options',
+    'output_dir',
+    'error_dir',
     'pre_commands',
     'root_archive',
     'root_archive_excludes',
@@ -44,7 +49,10 @@ CMD_GROUP_KEYS_GOOD = CMD_GROUP_KEYS_REQ + [
     'is_job_array',
     'modules',
     'nesting',
+    'scheduler',
     'scheduler_options',
+    'output_dir',
+    'error_dir',
     'profile_name',
     'profile_order',
     'exec_order',
@@ -58,6 +66,10 @@ CMD_GROUP_DEFAULTS = {
     'directory': '',
     'archive': None,
     'archive_excludes': [],
+    'scheduler': 'direct',
+    'scheduler_options': {},
+    'output_dir': CONFIG['default_output_dir'],
+    'error_dir': CONFIG['default_error_dir'],
 }
 
 

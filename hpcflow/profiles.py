@@ -166,6 +166,15 @@ def parse_job_profiles(dir_path=None, profile_list=None):
             # Overwrite with command-level parameters:
             cmd_group.update(**j)
             cmd_group['exec_order'] += exec_order_add
+
+            # Combine scheduler options with scheduler name:
+            cmd_group['scheduler'] = {
+                'name': cmd_group['scheduler'],
+                'options': cmd_group.pop('scheduler_options'),
+                'output_dir': cmd_group.pop('output_dir'),
+                'error_dir': cmd_group.pop('error_dir'),
+            }
+
             profile_cmd_groups.append(cmd_group)
 
             resolve_archives(cmd_group, archives)

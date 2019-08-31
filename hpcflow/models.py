@@ -21,12 +21,18 @@ from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
+from hpcflow.scheduler import SunGridEngine, DirectExecution
 from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex
 from hpcflow.validation import validate_task_multiplicity
 from hpcflow.variables import (
     select_cmd_group_var_names, select_cmd_group_var_definitions,
     extract_variable_names, resolve_variable_values, UnresolvedVariableError
 )
+
+SCHEDULER_MAP = {
+    'sge': SunGridEngine,
+    'direct': DirectExecution,
+}
 
 
 class Workflow(Base):
@@ -456,7 +462,7 @@ class CommandGroup(Base):
     exec_order = Column(Integer)
     nesting = Column(Enum(NestingType), nullable=True)
     modules = Column(JSON, nullable=True)
-    scheduler_options = Column(JSON, nullable=True)
+    _scheduler = Column('scheduler', JSON)
     profile_name = Column(String(255), nullable=True)
     profile_order = Column(Integer, nullable=True)
     archive_excludes = Column(JSON, nullable=True)
@@ -470,11 +476,12 @@ class CommandGroup(Base):
 
     directory_variable = relationship('VarDefinition')
 
+    _scheduler_obj = None
+
     def __init__(self, commands, directory_var, is_job_array=True,
-                 exec_order=None, nesting=None, modules=None,
-                 scheduler_options=None, profile_name=None,
-                 profile_order=None, archive=None, archive_excludes=None,
-                 archive_directory=None, alternate_scratch=None):
+                 exec_order=None, nesting=None, modules=None, scheduler=None,
+                 profile_name=None, profile_order=None, archive=None,
+                 archive_excludes=None, archive_directory=None, alternate_scratch=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -506,9 +513,10 @@ class CommandGroup(Base):
             List of modules that are to be loaded using the `module load`
             command, in order to ensure successful execution of the commands.
             By default set to `None`, such that no modules are loaded.
-        scheduler_options : dict, optional
-            Options to be passed directly to the scheduler. By default, `None`,
-            in which case no options are passed to the scheduler.
+        scheduler : dict, optional
+            Scheduler type and options to be passed directly to the scheduler. By default,
+            `None`, in which case the DirectExecution scheduler is used and no additional
+            options are passed.
         profile_name : str, optional
             If the command group was generated as part of a job profile file,
             the profile name should be passed here.
@@ -529,14 +537,12 @@ class CommandGroup(Base):
 
         """
 
-        scheduler_options.update({'cwd': ''})
-
         self.commands = commands
         self.is_job_array = is_job_array
         self.exec_order = exec_order
         self.nesting = nesting
         self.modules = modules
-        self.scheduler_options = scheduler_options
+        self.scheduler = scheduler
         self.directory_variable = directory_var
         self.profile_name = profile_name
         self.profile_order = profile_order
@@ -548,6 +554,10 @@ class CommandGroup(Base):
         self._alternate_scratch = alternate_scratch
 
         self.validate()
+
+    @reconstructor
+    def init_on_load(self):
+        self.scheduler = self._scheduler
 
     def validate(self):
 
@@ -569,6 +579,30 @@ class CommandGroup(Base):
             if not self.alternate_scratch.is_dir():
                 msg = 'Alternate scratch "{}" is not an existing directory.'
                 raise ValueError(msg.format(self.alternate_scratch))
+
+    @property
+    def scheduler(self):
+        return self._scheduler_obj
+
+    @scheduler.setter
+    def scheduler(self, scheduler):
+
+        if 'name' not in scheduler:
+            msg = 'Scheduler must have a name that is one of: {}'
+            raise ValueError(msg.format(list(SCHEDULER_MAP.keys())))
+
+        sch_name = scheduler['name']
+        if sch_name not in SCHEDULER_MAP.keys():
+            msg = 'Scheduler "{}" is not known.'.format(scheduler)
+            raise ValueError(msg)
+
+        sch_class = SCHEDULER_MAP[sch_name]
+        self._scheduler_obj = sch_class(
+            options=scheduler['options'],
+            output_dir=scheduler['output_dir'],
+            error_dir=scheduler['error_dir'],
+        )
+        self._scheduler = scheduler
 
     @property
     def alternate_scratch(self):
@@ -1018,6 +1052,16 @@ class Submission(Base):
     def write_submit_dirs(self, hf_dir):
         """Write the directory structure necessary for this submission."""
 
+        # Check scheduler output directories are present:
+        for cg_sub in self.command_group_submissions:
+            root_dir = self.workflow.directory
+            out_dir = root_dir.joinpath(cg_sub.command_group.scheduler.output_dir)
+            err_dir = root_dir.joinpath(cg_sub.command_group.scheduler.error_dir)
+            if not out_dir.is_dir():
+                out_dir.mkdir()
+            if not err_dir.is_dir():
+                err_dir.mkdir()
+
         wf_path = hf_dir.joinpath('workflow_{}'.format(self.workflow_id))
         if not wf_path.exists():
             wf_path.mkdir()
@@ -1383,140 +1427,19 @@ class CommandGroupSubmission(Base):
     def write_jobscript(self, dir_path):
         """Write the jobscript."""
 
-        js_ext = CONFIG.get('jobscript_ext', '')
-        js_name = 'js_{}'.format(self.command_group_exec_order)
-        js_fn = js_name + js_ext
-        js_path = dir_path.joinpath(js_fn)
+        print('self.command_group.scheduler: {}'.format(self.command_group.scheduler))
 
-        cmd_name = 'cmd_{}'.format(self.command_group_exec_order)
-        cmd_fn = cmd_name + js_ext
-
-        submit_dir_relative = dir_path.relative_to(
-            self.submission.workflow.directory).as_posix()
-
-        wk_dirs_path = ('${{SUBMIT_DIR}}'
-                        '/working_dirs_{}{}').format(
-                            self.command_group_exec_order,
-                            CONFIG['working_dirs_file_ext']
+        self.command_group.scheduler.write_jobscript(
+            dir_path=dir_path,
+            workflow_directory=self.submission.workflow.directory,
+            command_group_order=self.command_group_exec_order,
+            max_num_tasks=self.scheduler_group.max_num_tasks,
+            task_step_size=self.step_size,
+            modules=self.command_group.modules,
+            archive=self.command_group.archive is not None,
+            alternate_scratch_dir=self.alternate_scratch_dir,
+            command_group_submission_id=self.id_
         )
-
-        cmd_group = self.command_group
-
-        shebang = ['#!/bin/bash --login']
-
-        dt_stamp = datetime.now().strftime(r'%Y.%m.%d at %H:%M:%S')
-        about_msg = ['# --- jobscript generated by `hpcflow` (version: {}) '
-                     'on {} ---'.format(__version__, dt_stamp)]
-
-        sge_opts = ['#$ -{} {}'.format(k, v).strip()
-                    for k, v in sorted(cmd_group.scheduler_options.items())]
-
-        arr_opts = [
-            '#$ -t 1-{}:{}'.format(self.scheduler_group.max_num_tasks, self.step_size)
-        ]
-
-        define_dirs = [
-            'ROOT_DIR=`pwd`',
-            'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
-            'LOG_PATH=$SUBMIT_DIR/log_{}.$SGE_TASK_ID'.format(cmd_group.exec_order),
-            'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(self.step_size),
-            'INPUTS_DIR_REL=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
-            'INPUTS_DIR=$ROOT_DIR/$INPUTS_DIR_REL',
-        ]
-
-        if self.alternate_scratch_dir:
-            alt_scratch_exc_path = '$SUBMIT_DIR/{}_{}_$TASK_IDX{}'.format(
-                FILE_NAMES['alt_scratch_exc_file'],
-                self.command_group_exec_order,
-                FILE_NAMES['alt_scratch_exc_file_ext'],
-            )
-            define_dirs.append('ALT_SCRATCH_EXC=' + alt_scratch_exc_path)
-            in_dir_scratch = 'INPUTS_DIR_SCRATCH={}/$INPUTS_DIR_REL'.format(
-                self.alternate_scratch_dir)
-            copy_to_alt = [
-                ('rsync -avviz --exclude-from="${ALT_SCRATCH_EXC}" '
-                 '$INPUTS_DIR/ $INPUTS_DIR_SCRATCH >> $LOG_PATH 2>&1'),
-                '',
-            ]
-            move_from_alt = [
-                '',
-                ('rsync -avviz $INPUTS_DIR_SCRATCH/ $INPUTS_DIR --remove-source-files'
-                 ' >> $LOG_PATH 2>&1'),
-                '',
-            ]
-        else:
-            in_dir_scratch = 'INPUTS_DIR_SCRATCH=$INPUTS_DIR'
-            copy_to_alt = []
-            move_from_alt = []
-
-        define_dirs.append(in_dir_scratch)
-
-        log_stuff = [
-            r'touch $LOG_PATH',
-            r'printf "Jobscript variables:\n" >> $LOG_PATH 2>&1',
-            r'printf "ROOT_DIR:\t ${ROOT_DIR}\n" >> $LOG_PATH 2>&1',
-            r'printf "SUBMIT_DIR:\t ${SUBMIT_DIR}\n" >> $LOG_PATH 2>&1',
-            r'printf "LOG_PATH:\t ${LOG_PATH}\n" >> $LOG_PATH 2>&1',
-            r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',
-            r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
-            r'printf "INPUTS_DIR_REL:\t ${INPUTS_DIR_REL}\n" >> $LOG_PATH 2>&1',
-            r'printf "INPUTS_DIR:\t ${INPUTS_DIR}\n" >> $LOG_PATH 2>&1',
-            r'printf "INPUTS_DIR_SCRATCH:\t ${INPUTS_DIR_SCRATCH}\n" >> $LOG_PATH 2>&1',
-        ]
-
-        if self.alternate_scratch_dir:
-            log_stuff.append(
-                r'printf "ALT_SCRATCH_EXC:\t ${ALT_SCRATCH_EXC}\n" >> $LOG_PATH 2>&1',
-            )
-
-        log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
-
-        write_cmd_exec = [
-            ('hpcflow write-cmd -d $ROOT_DIR {0:} >> $LOG_PATH 2>&1').format(self.id_),
-        ]
-
-        if cmd_group.modules:
-            loads = [''] + [
-                'module load {}'.format(i) for i in sorted(cmd_group.modules)] + ['']
-        else:
-            loads = []
-
-        set_task_args = '-d $ROOT_DIR -t $TASK_IDX {} >> $LOG_PATH 2>&1'.format(self.id_)
-        cmd_exec = [
-            'hpcflow set-task-start {}'.format(set_task_args),
-            '',
-            'cd $INPUTS_DIR_SCRATCH',
-            '. $SUBMIT_DIR/{}'.format(cmd_fn),
-            '',
-            'hpcflow set-task-end {}'.format(set_task_args),
-        ]
-
-        arch_lns = []
-        if self.command_group.archive:
-            arch_lns = [
-                ('hpcflow archive -d $ROOT_DIR -t $TASK_IDX {0:} >> '
-                 '$LOG_PATH 2>&1'.format(self.id_)),
-                ''
-            ]
-
-        js_lines = (shebang + [''] +
-                    about_msg + [''] +
-                    sge_opts + [''] +
-                    arr_opts + [''] +
-                    define_dirs + [''] +
-                    log_stuff + [''] +
-                    write_cmd_exec + [''] +
-                    loads + [''] +
-                    copy_to_alt +
-                    cmd_exec +
-                    move_from_alt +
-                    arch_lns)
-
-        # Write jobscript:
-        with js_path.open('w') as handle:
-            handle.write('\n'.join(js_lines))
-
-        return js_path
 
     def write_runtime_files(self, project):
         'Write files necessary at command group run time to execute the commands.'
