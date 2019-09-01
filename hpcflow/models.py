@@ -1919,9 +1919,8 @@ class Task(Base):
         only_vals_uniform = coerce_same_length(list(only_vals))
 
         if self.command_group_submission.command_group.is_job_array:
-            if len(only_vals_uniform[0]) > 1:
-                val_idx = self.order_id % len(only_vals_uniform[0])
-                only_vals_uniform = [[i[val_idx]] for i in only_vals_uniform]
+            val_idx = self.order_id % len(only_vals_uniform[0])
+            only_vals_uniform = [[i[val_idx]] for i in only_vals_uniform]
 
         var_vals_normed = dict(zip(only_names, only_vals_uniform))
 
