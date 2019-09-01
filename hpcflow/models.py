@@ -1095,8 +1095,8 @@ class Submission(Base):
             var_values_path = sg_path.joinpath('var_values')
             var_values_path.mkdir()
 
-            for j in range(i.max_num_tasks):
-                j_fmt = zeropad(j + 1, i.max_num_tasks)
+            for j in range(1, i.max_num_tasks + 1):
+                j_fmt = zeropad(j, i.max_num_tasks + 1)
                 vv_j_path = var_values_path.joinpath(j_fmt)
                 vv_j_path.mkdir()
 
@@ -1260,65 +1260,6 @@ class CommandGroupSubmission(Base):
 
         return var_values
 
-    def get_variable_values_normed(self):
-        """Returns a list of dict whose keys are variable names."""
-
-        if not self.all_variables_resolved:
-            msg = ('Not all variable have been resolved for this command group'
-                   ' submission; cannot get normed variable values.')
-            raise ValueError(msg)
-
-        var_vals_dat_ii = {}
-        for i in self.command_group.variable_definitions:
-
-            var_vals_i = self.submission.get_variable_values(i)
-
-            cg_dirs = self.command_group.directory_variable.variable_values
-            for j in var_vals_i:
-                val_dir_val = j.directory_value
-
-                for k in cg_dirs:
-
-                    if val_dir_val == k:
-
-                        if val_dir_val.value in var_vals_dat_ii:
-
-                            if i.name in var_vals_dat_ii[val_dir_val.value]:
-                                var_vals_dat_ii[val_dir_val.value][i.name].append(j.value)
-                            else:
-                                var_vals_dat_ii[val_dir_val.value].update(
-                                    {i.name: [j.value]})
-                        else:
-                            var_vals_dat_ii.update({
-                                val_dir_val.value: {i.name: [j.value]}
-                            })
-
-        var_vals_normed_all = []
-
-        for cg_dir, var_vals in var_vals_dat_ii.items():
-
-            only_names = []
-            only_vals = []
-            for k, v in var_vals.items():
-                only_vals.append(v)
-                only_names.append(k)
-
-            only_vals_uniform = coerce_same_length(only_vals)
-
-            for i in list(map(list, zip(*only_vals_uniform))):
-
-                var_vals_normed = {
-                    'directory': cg_dir,
-                    'vals': {}
-                }
-
-                for j, k in zip(only_names, i):
-                    var_vals_normed['vals'].update({j: k})
-
-                var_vals_normed_all.append(var_vals_normed)
-
-        return var_vals_normed_all
-
     @property
     def all_variables_resolved(self):
         """Returns True if all variables associated with this command group
@@ -1399,6 +1340,10 @@ class CommandGroupSubmission(Base):
     def step_size(self):
         'Get the scheduler step size for this command group submission.'
         return self.scheduler_group.step_size[self.scheduler_group_index[1]]
+
+    @property
+    def num_tasks(self):
+        return len(self.tasks)
 
     @property
     def alternate_scratch_dir(self):
@@ -1522,63 +1467,29 @@ class CommandGroupSubmission(Base):
                     self.is_command_writing = None
                     session.commit()
 
-    def write_variable_files(self, project, req_task_idx):
+    def write_variable_files(self, project, task_idx):
 
-        var_vals = self.get_variable_values_normed()
+        task = self.get_task(task_idx)
+        var_vals_normed = task.get_variable_values_normed()
 
-        print('CGS.write_variable_files: req_task_idx: {}'.format(req_task_idx), flush=True)
-        print('CGS.write_variable_files: var_vals:', flush=True)
-        pprint(var_vals)
+        print('CGS.write_variable_files: task: {}'.format(task), flush=True)
+        print('CGS.write_variable_files: var_vals_normed: {}'.format(
+            var_vals_normed), flush=True)
 
-        var_group_len = 1 if self.command_group.is_job_array else self.task_multiplicity
-
-        task_idx = 0
-        var_vals_file_dat = {}
-        for idx in range(0, len(var_vals), var_group_len):
-
-            var_vals_sub = [i for i_idx, i in enumerate(var_vals)
-                            if i_idx in range(idx, idx + var_group_len)]
-
-            var_vals_file_dat.update({
-                task_idx: {}
-            })
-
-            for i in var_vals_sub:
-
-                for var_name, var_val in i['vals'].items():
-
-                    if var_name in var_vals_file_dat[task_idx]:
-                        var_vals_file_dat[task_idx][var_name].append(var_val)
-                    else:
-                        var_vals_file_dat[task_idx].update({
-                            var_name: [var_val]
-                        })
-
-            task_idx += self.step_size
-
-        print('CGS.write_variable_files: var_vals_file_dat:')
-        pprint(var_vals_file_dat)
-
-        sch_group_dir = project.hf_dir.joinpath(
+        var_values_task_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(self.submission.workflow.id_),
             'submit_{}'.format(self.submission.order_id),
             'scheduler_group_{}'.format(self.scheduler_group_index[0]),
+            'var_values',
+            zeropad(task.scheduler_id, self.scheduler_group.max_num_tasks),
         )
 
-        for task_idx, var_vals_file in var_vals_file_dat.items():
-
-            if task_idx == req_task_idx:
-
-                vals_dir_num = zeropad(task_idx + 1, self.scheduler_group.max_num_tasks)
-                var_vals_dir = sch_group_dir.joinpath('var_values', vals_dir_num)
-
-                for var_name, var_val_all in var_vals_file.items():
-                    var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
-                    var_file_path = var_vals_dir.joinpath(var_fn)
-
-                    with var_file_path.open('w') as handle:
-                        for i in var_val_all:
-                            handle.write('{}\n'.format(i))
+        for var_name, var_val_all in var_vals_normed.items():
+            var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
+            var_file_path = var_values_task_dir.joinpath(var_fn)
+            with var_file_path.open('w') as handle:
+                for i in var_val_all:
+                    handle.write('{}\n'.format(i))
 
     def write_command_file(self, project):
 
@@ -1741,12 +1652,14 @@ class VarValue(Base):
             '{}('
             'variable_name={}, '
             'value={}, '
-            'order_id={}'
+            'order_id={}, '
+            'directory={}'
             ')').format(
                 self.__class__.__name__,
                 self.variable_definition.name,
                 self.value,
                 self.order_id,
+                self.directory_value.value if self.directory_value else None,
         )
         return out
 
@@ -1953,6 +1866,66 @@ class Task(Base):
                     return False
 
         return True
+
+    def get_variable_values(self):
+        """Get the values of variables that are resolved in this task's working
+        directory.
+
+        Returns
+        -------
+        var_vals : dict of (str: list of str)
+            Keys are the variable definition name and values are list of variable
+            values as strings.
+
+        """
+
+        task_directory = self.get_working_directory()
+        sub_var_vals = self.command_group_submission.submission.variable_values
+        cmd_group_var_names = self.command_group_submission.command_group.variable_names
+        var_vals = {}
+
+        print('Task.get_variable_values: sub_var_vals:', flush=True)
+        pprint(sub_var_vals)
+
+        print('Task.get_variable_values: cmd_group_var_names:', flush=True)
+        pprint(cmd_group_var_names)
+
+        for i in sub_var_vals:
+            if i.directory_value == task_directory:
+                var_defn_name = i.variable_definition.name
+                if var_defn_name in cmd_group_var_names:
+                    if var_defn_name in var_vals:
+                        var_vals[var_defn_name].append(i.value)
+                    else:
+                        var_vals.update({var_defn_name: [i.value]})
+
+        return var_vals
+
+    def get_variable_values_normed(self):
+        """Get the values of variables that are resolved in this task's working
+        directory, where all variable values have the same, normalised multiplicity.
+
+        Returns
+        -------
+        var_vals_normed : dict of (str: list of str)
+            Keys are the variable definition name and values are list of variable
+            values as strings. The list of variable values is the same length for
+            each variable definition name.
+
+        """
+
+        var_vals = self.get_variable_values()
+        only_names, only_vals = zip(*var_vals.items())
+        only_vals_uniform = coerce_same_length(list(only_vals))
+
+        if self.command_group_submission.command_group.is_job_array:
+            if len(only_vals_uniform[0]) > 1:
+                val_idx = self.order_id % len(only_vals_uniform[0])
+                only_vals_uniform = [[i[val_idx]] for i in only_vals_uniform]
+
+        var_vals_normed = dict(zip(only_names, only_vals_uniform))
+
+        return var_vals_normed
 
 
 class SchedulerGroup(object):
