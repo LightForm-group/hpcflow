@@ -1915,6 +1915,9 @@ class Task(Base):
         """
 
         var_vals = self.get_variable_values()
+        if not var_vals:
+            return {}
+
         only_names, only_vals = zip(*var_vals.items())
         only_vals_uniform = coerce_same_length(list(only_vals))
 
