@@ -223,7 +223,7 @@ def extract_variable_names(source_str, delimiters, characters=None):
     """
 
     if not characters:
-        characters = r'.+?'
+        characters = r'.\S+?'
 
     if not characters.endswith('?'):
         # Always match as few characters as possible.
