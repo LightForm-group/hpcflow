@@ -315,6 +315,7 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
                 if show_task_end:
                     headers = headers[:5] + ['End'] + headers[5:]
                 task_table.column_headers = headers
+                task_table.column_alignments['Duration'] = BeautifulTable.ALIGN_RIGHT
 
                 for task in cmd_group_sub['tasks']:
                     row = [
