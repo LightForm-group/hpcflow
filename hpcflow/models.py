@@ -1507,8 +1507,10 @@ class CommandGroupSubmission(Base):
                 cmd_ln = ''
             is_parallel = 'pe' in self.command_group.scheduler.options
             if is_parallel:
-                cmd_ln += 'mpirun -np $NSLOTS '
-            cmd_ln += i.replace(delims[0], '${').replace(delims[1], '}')
+                cmd_ln += 'mpirun -np $NSLOTS '            
+            if extract_variable_names(i, delims):
+                i = i.replace(delims[0], '${').replace(delims[1], '}')            
+            cmd_ln += i
             lns_cmd.append(cmd_ln)
 
         lns_while_end = [
