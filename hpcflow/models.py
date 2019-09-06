@@ -48,6 +48,7 @@ class Workflow(Base):
     root_archive_excludes = Column(JSON, nullable=True)
     root_archive_directory = Column(String(255), nullable=True)
     _profile_files = Column('profile_files', JSON, nullable=True)
+    loop_iterations = Column(Integer)
 
     command_groups = relationship(
         'CommandGroup',
@@ -60,7 +61,7 @@ class Workflow(Base):
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
-                 root_archive_excludes=None, profile_files=None):
+                 root_archive_excludes=None, profile_files=None, loop_iterations=1):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -92,6 +93,8 @@ class Workflow(Base):
         profile_files : list of Path, optional
             If specified, the list of absolute file paths to the profile files used to
             generate this workflow.
+        loop_iterations : int, optional
+            Number of times the whole workflow should be repeated.
 
         """
 
@@ -130,6 +133,7 @@ class Workflow(Base):
         self._directory = str(directory)
         self.profile_files = [i.relative_to(self.directory) for i in profile_files]
         self.create_time = datetime.now()
+        self.loop_iterations = loop_iterations
         self.pre_commands = pre_commands
         self.variable_definitions = [
             VarDefinition(name=k, **v) for k, v in var_definitions.items()
@@ -865,8 +869,9 @@ class Submission(Base):
 
         # `Task`s must be generated after `SchedulerGroup`s:
         for cg_sub in self.command_group_submissions:
-            for task_num in range(cg_sub.num_outputs):
-                Task(cg_sub, task_num)
+            for iter_idx in range(self.workflow.loop_iterations):
+                for task_num in range(cg_sub.num_outputs):
+                    Task(cg_sub, task_num, iter_idx)
 
     @reconstructor
     def init_on_load(self):
@@ -877,11 +882,14 @@ class Submission(Base):
         if self.workflow.has_alternate_scratch:
             # Create new directory on alternate scratch for this submission.
 
-            # Get list of unique alternate scratches:
-            alt_scratches = []
+            # Get unique alternate scratches and the associated command groups 
+            alt_scratches = {}
             for cg in self.workflow.command_groups:
-                if cg.alternate_scratch and cg.alternate_scratch not in alt_scratches:
-                    alt_scratches.append(cg.alternate_scratch)
+                if cg.alternate_scratch:
+                    if cg.alternate_scratch in alt_scratches:
+                        alt_scratches[cg.alternate_scratch].append(cg)
+                    else:
+                        alt_scratches.update({cg.alternate_scratch: [cg]})
 
             # Find a suitable alternate scratch directory name for this submission:
             count = 0
@@ -899,10 +907,27 @@ class Submission(Base):
                     raise RuntimeError(msg.format(MAX_COUNT))
 
             # Make alternate scratch directories:
-            for i in alt_scratches:
-                for working_dir in self.working_directories:
-                    alt_scratch_w_dir = i.joinpath(alt_dirname, working_dir.value)
-                    alt_scratch_w_dir.mkdir(parents=True)
+            for alt_scratch, cmd_groups in alt_scratches.items():
+
+                # Make "root" alt scratch dir:
+                alt_scratch_root = alt_scratch.joinpath(alt_dirname)
+                alt_scratch_root.mkdir(parents=False, exist_ok=False)
+
+                # Get all working directories of each alt scratch cmd_group:
+                working_dirs = []
+                for cg in cmd_groups:
+                    for cg_sub in self.command_group_submissions:
+                        if cg_sub.command_group is cg:
+                            for i in cg_sub.directories:
+                                if i not in working_dirs:
+                                    working_dirs.append(i)
+                
+                for working_dir in working_dirs:
+                    if working_dir.value == '.':
+                        # Already made "root" dir.
+                        continue
+                    alt_scratch_w_dir = alt_scratch_root.joinpath(working_dir.value)
+                    alt_scratch_w_dir.mkdir(parents=True, exist_ok=False)
 
             self.alt_scratch_dir_name = alt_dirname
 
@@ -1069,36 +1094,41 @@ class Submission(Base):
         submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         submit_path.mkdir()
 
-        for idx, i in enumerate(self.scheduler_groups):
+        for iter_idx in range(self.workflow.loop_iterations):
 
-            sg_path = submit_path.joinpath('scheduler_group_{}'.format(idx))
-            sg_path.mkdir()
+            iter_path = submit_path.joinpath('iter_{}'.format(iter_idx))
+            iter_path.mkdir()
 
-            # Loop through cmd groups in this scheduler group:
-            for cg_sub_idx, cg_sub in enumerate(i.command_group_submissions):
+            for idx, i in enumerate(self.scheduler_groups):
 
-                dir_vals = cg_sub.directory_values
-                all_dir_slots = [''] * i.max_num_tasks
+                sg_path = iter_path.joinpath('scheduler_group_{}'.format(idx))
+                sg_path.mkdir()
 
-                # Distribute dirs over num_dir_slots:
-                for k in range(0, i.max_num_tasks, i.step_size[cg_sub_idx]):
-                    dir_idx = floor((k / i.max_num_tasks) * len(dir_vals))
-                    all_dir_slots[k] = dir_vals[dir_idx]
+                # Loop through cmd groups in this scheduler group:
+                for cg_sub_idx, cg_sub in enumerate(i.command_group_submissions):
 
-                wk_dirs_path = submit_path.joinpath('working_dirs_{}{}'.format(
-                    cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']))
+                    dir_vals = cg_sub.directory_values
+                    all_dir_slots = [''] * i.max_num_tasks
 
-                with wk_dirs_path.open('w') as handle:
-                    for dir_path in all_dir_slots:
-                        handle.write('{}\n'.format(dir_path))
+                    # Distribute dirs over num_dir_slots:
+                    for k in range(0, i.max_num_tasks, i.step_size[cg_sub_idx]):
+                        dir_idx = floor((k / i.max_num_tasks) * len(dir_vals))
+                        all_dir_slots[k] = dir_vals[dir_idx]
 
-            var_values_path = sg_path.joinpath('var_values')
-            var_values_path.mkdir()
+                    wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(
+                        cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']))
 
-            for j in range(1, i.max_num_tasks + 1):
-                j_fmt = zeropad(j, i.max_num_tasks + 1)
-                vv_j_path = var_values_path.joinpath(j_fmt)
-                vv_j_path.mkdir()
+                    with wk_dirs_path.open('w') as handle:
+                        for dir_path in all_dir_slots:
+                            handle.write('{}\n'.format(dir_path))
+
+                var_values_path = sg_path.joinpath('var_values')
+                var_values_path.mkdir()
+
+                for j in range(1, i.max_num_tasks + 1):
+                    j_fmt = zeropad(j, i.max_num_tasks + 1)
+                    vv_j_path = var_values_path.joinpath(j_fmt)
+                    vv_j_path.mkdir()
 
         if self.workflow.has_alternate_scratch:
 
@@ -1164,41 +1194,50 @@ class Submission(Base):
 
         sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
         last_submit_id = None
-        for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
+        for iter_idx in range(self.workflow.loop_iterations):
 
-            qsub_cmd = [sumbit_cmd]
+            iter_idx_var = 'ITER_IDX={}'.format(iter_idx)
 
-            if last_submit_id:
-                # Add conditional submission:
-                if cg_sub.command_group.nesting == NestingType('hold'):
-                    hold_arg = '-hold_jid'
-                else:
-                    hold_arg = '-hold_jid_ad'
+            for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
 
-                qsub_cmd += [hold_arg, last_submit_id]
+                qsub_cmd = [sumbit_cmd]
+                
+                if last_submit_id:
 
-            qsub_cmd.append(str(js_path))
+                    # Add conditional submission:
+                    if iter_idx > 0:
+                        hold_arg = '-hold_jid'                    
+                    elif cg_sub.command_group.nesting == NestingType('hold'):
+                        hold_arg = '-hold_jid'
+                    else:
+                        hold_arg = '-hold_jid_ad'
 
-            print('Submitting jobscript with command: {}'.format(' '.join(qsub_cmd)), flush=True)
+                    qsub_cmd += [hold_arg, last_submit_id]
 
-            proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
-            qsub_out = proc.stdout.decode().strip()
-            qsub_err = proc.stderr.decode().strip()
-            print(qsub_out, flush=True)
-            print(qsub_err, flush=True)
+                qsub_cmd += ['-v', iter_idx_var]
+                qsub_cmd.append(str(js_path))
 
-            # Extract newly submitted job ID:
-            pattern = r'[0-9]+'
-            job_id_search = re.search(pattern, qsub_out)
-            try:
-                job_id_str = job_id_search.group()
-            except AttributeError:
-                msg = ('Could not retrieve the job ID from the submitted jobscript found '
-                       'at {}. No more jobscripts will be submitted.')
-                raise ValueError(msg.format(js_path))
+                print('Submitting jobscript (iteration {}) with command: {}'.format(
+                    iter_idx, ' '.join(qsub_cmd)), flush=True)
 
-            cg_sub.scheduler_job_id = int(job_id_str)
-            last_submit_id = job_id_str
+                proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
+                qsub_out = proc.stdout.decode().strip()
+                qsub_err = proc.stderr.decode().strip()
+                print(qsub_out, flush=True)
+                print(qsub_err, flush=True)
+
+                # Extract newly submitted job ID:
+                pattern = r'[0-9]+'
+                job_id_search = re.search(pattern, qsub_out)
+                try:
+                    job_id_str = job_id_search.group()
+                except AttributeError:
+                    msg = ('Could not retrieve the job ID from the submitted jobscript '
+                           'found at {}. No more jobscripts will be submitted.')
+                    raise ValueError(msg.format(js_path))
+
+                cg_sub.scheduler_job_id = int(job_id_str)
+                last_submit_id = job_id_str
 
     def get_stats(self, jsonable=True):
         'Get task statistics for this submission.'
@@ -1406,10 +1445,10 @@ class CommandGroupSubmission(Base):
 
         return js_path
 
-    def write_runtime_files(self, project, task_idx):
+    def write_runtime_files(self, project, task_idx, iter_idx):
 
         self.queue_write_command_file(project)
-        self.write_variable_files(project, task_idx)
+        self.write_variable_files(project, task_idx, iter_idx)
 
     def queue_write_command_file(self, project):
         """Ensure the command file for this command group submission is written, ready
@@ -1469,9 +1508,9 @@ class CommandGroupSubmission(Base):
                     self.is_command_writing = None
                     session.commit()
 
-    def write_variable_files(self, project, task_idx):
+    def write_variable_files(self, project, task_idx, iter_idx):
 
-        task = self.get_task(task_idx)
+        task = self.get_task(task_idx, iter_idx)
         var_vals_normed = task.get_variable_values_normed()
 
         print('CGS.write_variable_files: task: {}'.format(task), flush=True)
@@ -1481,6 +1520,7 @@ class CommandGroupSubmission(Base):
         var_values_task_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(self.submission.workflow.id_),
             'submit_{}'.format(self.submission.order_id),
+            'iter_{}'.format(iter_idx),
             'scheduler_group_{}'.format(self.scheduler_group_index[0]),
             'var_values',
             zeropad(task.scheduler_id, self.scheduler_group.max_num_tasks),
@@ -1509,9 +1549,9 @@ class CommandGroupSubmission(Base):
                 cmd_ln = ''
             is_parallel = 'pe' in self.command_group.scheduler.options
             if is_parallel:
-                cmd_ln += 'mpirun -np $NSLOTS '            
+                cmd_ln += 'mpirun -np $NSLOTS '
             if extract_variable_names(i, delims):
-                i = i.replace(delims[0], '${').replace(delims[1], '}')            
+                i = i.replace(delims[0], '${').replace(delims[1], '}')
             cmd_ln += i
             lns_cmd.append(cmd_ln)
 
@@ -1537,7 +1577,7 @@ class CommandGroupSubmission(Base):
             fd_idx = idx + 3
 
             var_fn = 'var_{}{}'.format(i.name, CONFIG['variable_file_ext'])
-            var_file_path = ('$SUBMIT_DIR/scheduler_group_{}/var_values'
+            var_file_path = ('$ITER_DIR/scheduler_group_{}/var_values'
                              '/$ZEROPAD_TASK_ID/{}').format(
                                  self.scheduler_group_index[0], var_fn)
 
@@ -1569,33 +1609,34 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
-    def get_task(self, task_idx):
+    def get_task(self, task_idx, iter_idx):
         session = Session.object_session(self)
         task = session.query(Task).filter_by(
             command_group_submission_id=self.id_,
             order_id=task_idx,
+            iteration_idx=iter_idx,
         ).one()
         return task
 
-    def set_task_start(self, task_idx):
+    def set_task_start(self, task_idx, iter_idx):
         context = 'CommandGroupSubmission.set_task_start'
         msg = '{{}} {}: Task index {} started.'.format(context, task_idx)
         start_time = datetime.now()
         print(msg.format(start_time), flush=True)
-        task = self.get_task(task_idx)
+        task = self.get_task(task_idx, iter_idx)
         task.start_time = start_time
         print('task: {}'.format(task))
 
-    def set_task_end(self, task_idx):
+    def set_task_end(self, task_idx, iter_idx):
         context = 'CommandGroupSubmission.set_task_end'
         msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
         end_time = datetime.now()
         print(msg.format(end_time), flush=True)
-        task = self.get_task(task_idx)
+        task = self.get_task(task_idx, iter_idx)
         task.end_time = end_time
         print('task: {}'.format(task))
 
-    def do_archive(self, task_idx):
+    def do_archive(self, task_idx, iter_idx):
         """Archive the working directory associated with a given task in this command
         group submission."""
 
@@ -1608,6 +1649,7 @@ class CommandGroupSubmission(Base):
         task = session.query(Task).filter_by(
             command_group_submission_id=self.id_,
             order_id=task_idx,
+            iteration_idx=iter_idx,
         ).one()
 
         self.command_group.archive.execute_with_lock(session=session, task=task)
@@ -1692,6 +1734,7 @@ class Task(Base):
     end_time = Column(DateTime)
     memory = Column(Float)
     hostname = Column(String(255))
+    iteration_idx = Column(Integer)
     archive_status = Column(Enum(TaskArchiveStatus), nullable=True)
     _archive_start_time = Column('archive_start_time', DateTime, nullable=True)
     _archive_end_time = Column('archive_end_time', DateTime, nullable=True)
@@ -1705,8 +1748,9 @@ class Task(Base):
 
     archived_task = relationship('Task', uselist=False, remote_side=id_)
 
-    def __init__(self, command_group_submission, order_id):
+    def __init__(self, command_group_submission, order_id, iter_idx):
         self.order_id = order_id
+        self.iteration_idx = iter_idx
         self.command_group_submission = command_group_submission
         self.start_time = None
         self.end_time = None
@@ -1718,12 +1762,14 @@ class Task(Base):
         out = (
             '{}('
             'order_id={}, '
+            'iteration_idx={}, '
             'command_group_submission_id={}, '
             'start_time={}, '
             'end_time={}'
             ')').format(
                 self.__class__.__name__,
                 self.order_id,
+                self.iteration_idx,
                 self.command_group_submission_id,
                 self.start_time,
                 self.end_time,

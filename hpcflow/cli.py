@@ -156,38 +156,43 @@ def make(directory=None, profiles=None, json_file=None, json=None):
 @click.option('--directory', '-d')
 @click.argument('cmd_group_sub_id', type=click.INT)
 @click.argument('task_idx', type=click.INT)
-def write_runtime_files(cmd_group_sub_id, task_idx, directory=None):
+@click.argument('iter_idx', type=click.INT)
+def write_runtime_files(cmd_group_sub_id, task_idx, iter_idx, directory=None):
     print('hpcflow.cli.write_runtime_files', flush=True)
-    api.write_runtime_files(cmd_group_sub_id, task_idx, directory)
+    api.write_runtime_files(cmd_group_sub_id, task_idx, iter_idx, directory)
 
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--task_idx', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
-def set_task_start(cmd_group_sub_id, task_idx, directory=None):
+@click.argument('task_idx', type=click.INT)
+@click.argument('iter_idx', type=click.INT)
+def set_task_start(cmd_group_sub_id, task_idx, iter_idx, directory=None):
     print('hpcflow.cli.set_task_start', flush=True)
-    api.set_task_start(cmd_group_sub_id, task_idx, directory)
+    api.set_task_start(cmd_group_sub_id, task_idx, iter_idx, directory)
 
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--task_idx', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
-def set_task_end(cmd_group_sub_id, task_idx, directory=None):
+@click.argument('task_idx', type=click.INT)
+@click.argument('iter_idx', type=click.INT)
+def set_task_end(cmd_group_sub_id, task_idx, iter_idx, directory=None):
     print('hpcflow.cli.set_task_end', flush=True)
-    api.set_task_end(cmd_group_sub_id, task_idx, directory)
+    api.set_task_end(cmd_group_sub_id, task_idx, iter_idx, directory)
 
 
 @cli.command()
 @click.option('--directory', '-d')
-@click.option('--task', '-t', type=click.INT)
 @click.argument('cmd_group_sub_id', type=click.INT)
-def archive(cmd_group_sub_id, task, directory=None):
+@click.argument('task_idx', type=click.INT)
+@click.argument('iter_idx', type=click.INT)
+def archive(cmd_group_sub_id, task_idx, iter_idx, directory=None):
     print('hpcflow.cli.archive', flush=True)
     api.archive(
         cmd_group_sub_id,
-        task,
+        task_idx,
+        iter_idx,
         directory
     )
 

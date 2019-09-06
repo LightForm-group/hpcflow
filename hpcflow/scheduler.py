@@ -100,7 +100,7 @@ class SunGridEngine(Scheduler):
 
         submit_dir_relative = dir_path.relative_to(workflow_directory).as_posix()
 
-        wk_dirs_path = ('${{SUBMIT_DIR}}/working_dirs_{}{}').format(
+        wk_dirs_path = ('${{ITER_DIR}}/working_dirs_{}{}').format(
             command_group_order, CONFIG['working_dirs_file_ext'])
 
         dt_stamp = datetime.now().strftime(r'%Y.%m.%d at %H:%M:%S')
@@ -110,7 +110,8 @@ class SunGridEngine(Scheduler):
         define_dirs = [
             'ROOT_DIR=`pwd`',
             'SUBMIT_DIR=$ROOT_DIR/{}'.format(submit_dir_relative),
-            'LOG_PATH=$SUBMIT_DIR/log_{}.$SGE_TASK_ID'.format(command_group_order),
+            'ITER_DIR=$SUBMIT_DIR/iter_$ITER_IDX',
+            'LOG_PATH=$ITER_DIR/log_{}.$SGE_TASK_ID'.format(command_group_order),
             'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(task_step_size),
             'INPUTS_DIR_REL=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
             'INPUTS_DIR=$ROOT_DIR/$INPUTS_DIR_REL',
@@ -146,8 +147,10 @@ class SunGridEngine(Scheduler):
         log_stuff = [
             r'touch $LOG_PATH',
             r'printf "Jobscript variables:\n" >> $LOG_PATH 2>&1',
+            r'printf "ITER_IDX:\t ${ITER_IDX}\n" >> $LOG_PATH 2>&1',
             r'printf "ROOT_DIR:\t ${ROOT_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "SUBMIT_DIR:\t ${SUBMIT_DIR}\n" >> $LOG_PATH 2>&1',
+            r'printf "ITER_DIR:\t ${ITER_DIR}\n" >> $LOG_PATH 2>&1',
             r'printf "LOG_PATH:\t ${LOG_PATH}\n" >> $LOG_PATH 2>&1',
             r'printf "SGE_TASK_ID:\t ${SGE_TASK_ID}\n" >> $LOG_PATH 2>&1',
             r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
@@ -163,15 +166,16 @@ class SunGridEngine(Scheduler):
 
         log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
 
-        write_cmd_exec = [('hpcflow write-runtime-files -d $ROOT_DIR {0:} $TASK_IDX '
-                           '>> $LOG_PATH 2>&1').format(command_group_submission_id)]
+        write_cmd_exec = [('hpcflow write-runtime-files -d $ROOT_DIR {} $TASK_IDX '
+                           '$ITER_IDX >> $LOG_PATH 2>&1').format(
+                               command_group_submission_id)]
 
         if modules:
             loads = [''] + ['module load {}'.format(i) for i in sorted(modules)] + ['']
         else:
             loads = []
 
-        set_task_args = '-d $ROOT_DIR -t $TASK_IDX {} >> $LOG_PATH 2>&1'.format(
+        set_task_args = '-d $ROOT_DIR {} $TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1'.format(
             command_group_submission_id)
         cmd_exec = [
             'hpcflow set-task-start {}'.format(set_task_args),
@@ -185,7 +189,7 @@ class SunGridEngine(Scheduler):
         arch_lns = []
         if archive:
             arch_lns = [
-                ('hpcflow archive -d $ROOT_DIR -t $TASK_IDX {0:} >> '
+                ('hpcflow archive -d $ROOT_DIR {} $TASK_IDX $ITER_IDX >> '
                  '$LOG_PATH 2>&1'.format(command_group_submission_id)),
                 ''
             ]

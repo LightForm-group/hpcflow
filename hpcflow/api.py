@@ -155,7 +155,7 @@ def clean(dir_path=None):
     project.clean()
 
 
-def write_runtime_files(cmd_group_sub_id, task_idx, dir_path=None):
+def write_runtime_files(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
     """Write the commands files for a given command group submission.
 
     Parameters
@@ -175,39 +175,39 @@ def write_runtime_files(cmd_group_sub_id, task_idx, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.write_runtime_files(project, task_idx)
+    cg_sub.write_runtime_files(project, task_idx, iter_idx)
 
     session.commit()
     session.close()
 
 
-def set_task_start(cmd_group_sub_id, task_idx, dir_path=None):
+def set_task_start(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
 
     project = Project(dir_path)
     Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.set_task_start(task_idx)
+    cg_sub.set_task_start(task_idx, iter_idx)
 
     session.commit()
     session.close()
 
 
-def set_task_end(cmd_group_sub_id, task_idx, dir_path=None):
+def set_task_end(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
 
     project = Project(dir_path)
     Session = init_db(project, check_exists=True)
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.set_task_end(task_idx)
+    cg_sub.set_task_end(task_idx, iter_idx)
 
     session.commit()
     session.close()
 
 
-def archive(cmd_group_sub_id, task_idx, dir_path=None):
+def archive(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
     """Initiate an archive of a given task.
 
     Parameters
@@ -229,7 +229,7 @@ def archive(cmd_group_sub_id, task_idx, dir_path=None):
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.do_archive(task_idx)
+    cg_sub.do_archive(task_idx, iter_idx)
 
     session.commit()
     session.close()

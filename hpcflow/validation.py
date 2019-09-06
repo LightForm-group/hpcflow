@@ -24,6 +24,7 @@ PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
     'directory',
     'inherits',
     'is_job_array',
+    'loop_iterations',
     'modules',
     'nesting',
     'scheduler',
