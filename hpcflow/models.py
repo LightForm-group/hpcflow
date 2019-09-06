@@ -881,6 +881,7 @@ class Submission(Base):
         # `Task`s must be generated after `SchedulerGroup`s:
         for cg_sub in self.command_group_submissions:
             for iteration in self.workflow.iterations:
+                CommandGroupSubmissionIteration(iteration, cg_sub)
                 for task_num in range(cg_sub.num_outputs):
                     Task(cg_sub, task_num, iteration)
 
@@ -1055,8 +1056,10 @@ class Submission(Base):
                     # Move on to next command group:
                     continue
 
-                dir_var_vals_dat_new = [j for j in dir_var_vals_dat
-                                        if j not in cg_dirs_var_vals_other_val]
+                dir_var_vals_dat_new = [
+                    j for j in dir_var_vals_dat
+                    if (j not in cg_dirs_var_vals_other_val or j == '.')
+                ]
 
                 print(('Submission.resolve_variable_values: new directories are: '
                        '{}.'.format(dir_var_vals_dat_new)), flush=True)
@@ -1260,6 +1263,7 @@ class Submission(Base):
                            'found at {}. No more jobscripts will be submitted.')
                     raise ValueError(msg.format(js_path))
 
+                # TODO: include job_ids from all iterations!
                 cg_sub.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
@@ -1304,6 +1308,12 @@ class CommandGroupSubmission(Base):
     )
 
     tasks = relationship('Task', back_populates='command_group_submission')
+
+    command_group_submission_iterations = relationship(
+        'CommandGroupSubmissionIteration',
+        back_populates='command_group_submission',
+        uselist=False,
+    )
 
     def __init__(self, command_group, submission):
 
@@ -1399,6 +1409,11 @@ class CommandGroupSubmission(Base):
     @property
     def num_tasks(self):
         return len(self.tasks)
+
+    def get_command_group_submission_iteration(self, iteration):
+        for i in iteration.command_group_submission_iterations:
+            if i.command_group_submission == self:
+                return i
 
     @property
     def alternate_scratch_dir(self):
@@ -1519,11 +1534,12 @@ class CommandGroupSubmission(Base):
                     print(refresh_vals_msg.format(datetime.now()), flush=True)
                     self.submission.resolve_variable_values(project.dir_path, iteration)
 
-                    if not iteration.working_dirs_written:
+                    cg_sub_iter = self.get_command_group_submission_iteration(iteration)
+                    if not cg_sub_iter.working_dirs_written:
                         # This needs to happen once *per iteration* per CGS:
                         print(write_dirs_msg.format(datetime.now()), flush=True)
                         self.write_working_directories(project, iteration)
-                        iteration.working_dirs_written = True
+                        cg_sub_iter.working_dirs_written = True
 
                     if not self.commands_written:
                         # This needs to happen once per CGS:
@@ -1924,6 +1940,7 @@ class Task(Base):
             'hostname': self.hostname,
             'working_directory': self.get_working_directory_value(),
             'archive_status': self.archive_status,
+            'iteration': self.iteration.order_id,
         }
 
         if jsonable:
@@ -2059,9 +2076,12 @@ class Iteration(Base):
     id_ = Column('id', Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey('workflow.id'))
     order_id = Column(Integer)
-    working_dirs_written = Column(Boolean, default=False)
 
     workflow = relationship('Workflow', back_populates='iterations', uselist=False)
+    command_group_submission_iterations = relationship(
+        'CommandGroupSubmissionIteration',
+        back_populates='iteration',
+    )
 
     def __init__(self, order_id):
         self.order_id = order_id
@@ -2078,6 +2098,31 @@ class Iteration(Base):
             self.order_id,
         )
         return out
+
+
+class CommandGroupSubmissionIteration(Base):
+
+    __tablename__ = 'command_group_submission_iteration'
+
+    id_ = Column('id', Integer, primary_key=True)
+    working_dirs_written = Column(Boolean, default=False)
+    iteration_id = Column(Integer, ForeignKey('iteration.id'))
+    command_group_submission_id = Column(
+        Integer, ForeignKey('command_group_submission.id'))
+
+    iteration = relationship(
+        'Iteration',
+        back_populates='command_group_submission_iterations',
+        uselist=False,
+    )
+    command_group_submission = relationship(
+        'CommandGroupSubmission',
+        back_populates='command_group_submission_iterations',
+    )
+
+    def __init__(self, iteration, command_group_submission):
+        self.iteration = iteration
+        self.command_group_submission = command_group_submission
 
 
 class SchedulerGroup(object):
