@@ -1133,7 +1133,6 @@ class Submission(Base):
                 if err_dir not in excluded_paths:
                     excluded_paths.append(err_dir)
 
-            # self.working_directories DOES NOT EXISTS (removed in a024b1d564862d9b4757f26b41a1eba120b795cb)
             working_dir_paths = [Path(i.value) for i in self.working_directories]
 
             alt_scratch_exclusions = {i: [] for i in working_dir_paths}
