@@ -931,14 +931,6 @@ class Submission(Base):
 
             self.alt_scratch_dir_name = alt_dirname
 
-    @property
-    def working_directories(self):
-        dirs = []
-        for cg_sub in self.command_group_submissions:
-            for i in cg_sub.directories:
-                if i not in dirs:
-                    dirs.append(i)
-        return dirs
 
     @property
     def scheduler_groups(self):
