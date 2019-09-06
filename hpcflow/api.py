@@ -302,8 +302,8 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
                 task_table.set_style(BeautifulTable.STYLE_BOX)
                 task_table.row_separator_char = ''
                 headers = [
-                    '',
-                    'TID',
+                    'It.',
+                    '#',
                     'SID',
                     'Dir.',
                     'Start',
@@ -319,8 +319,8 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
 
                 for task in cmd_group_sub['tasks']:
                     row = [
+                        task['iteration'],
                         task['order_id'],
-                        task['task_id'],
                         task['scheduler_id'],
                         task['working_directory'],
                         task['start_time'] or 'pending',
