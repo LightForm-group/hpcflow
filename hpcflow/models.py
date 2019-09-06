@@ -1085,7 +1085,7 @@ class Submission(Base):
 
                 # Loop through cmd groups in this scheduler group:
                 for cg_sub_idx, cg_sub in enumerate(i.command_group_submissions):
-                   
+
                     num_dir_vals = cg_sub.num_directories
                     all_dir_slots = [''] * i.max_num_tasks
 
