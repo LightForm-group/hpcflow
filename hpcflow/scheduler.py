@@ -116,7 +116,7 @@ class SunGridEngine(Scheduler):
         ]
 
         write_cmd_exec = [('hpcflow write-runtime-files -d $ROOT_DIR {} $TASK_IDX '
-                           '$ITER_IDX >> $LOG_PATH 2>&1').format(
+                           '$ITER_IDX > $LOG_PATH 2>&1').format(
                                command_group_submission_id)]
 
         define_dirs_B = [
@@ -152,7 +152,6 @@ class SunGridEngine(Scheduler):
         define_dirs_B.append(in_dir_scratch)
 
         log_stuff = [
-            r'touch $LOG_PATH',
             r'printf "Jobscript variables:\n" >> $LOG_PATH 2>&1',
             r'printf "ITER_IDX:\t ${ITER_IDX}\n" >> $LOG_PATH 2>&1',
             r'printf "ROOT_DIR:\t ${ROOT_DIR}\n" >> $LOG_PATH 2>&1',
