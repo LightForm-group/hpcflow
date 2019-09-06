@@ -1273,18 +1273,6 @@ class CommandGroupSubmission(Base):
         return var_values
 
     @property
-    def all_variables_resolved(self):
-        """Returns True if all variables associated with this command group
-        submission have been resolved."""
-
-        print('CGS.all_variables_resolved')
-        for i in self.command_group.variable_definitions:
-            if not self.submission.is_variable_resolved(i):
-                return False
-
-        return True
-
-    @property
     def num_submitted_tasks(self):
         """Get the number of submitted tasks based on the task range.
 
