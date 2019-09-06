@@ -933,11 +933,10 @@ class Submission(Base):
 
             self.alt_scratch_dir_name = alt_dirname
 
-    @property
-    def working_directories(self):
+    def get_working_directories(self, iter_idx):
         dirs = []
         for cg_sub in self.command_group_submissions:
-            for i in cg_sub.directories:
+            for i in cg_sub.get_directories(iter_idx):
                 if i not in dirs:
                     dirs.append(i)
         return dirs
@@ -1133,7 +1132,9 @@ class Submission(Base):
                 if err_dir not in excluded_paths:
                     excluded_paths.append(err_dir)
 
-            working_dir_paths = [Path(i.value) for i in self.working_directories]
+            # TODO: This won't work with iter_idx > 0:
+            working_dir_paths = [Path(i.value)
+                                 for i in self.get_working_directories(iter_idx=0)]
 
             alt_scratch_exclusions = {i: [] for i in working_dir_paths}
             for working_dir in working_dir_paths:
