@@ -1179,6 +1179,8 @@ class Submission(Base):
 
             qsub_cmd.append(str(js_path))
 
+            print('Submitting jobscript with command: {}'.format(' '.join(qsub_cmd)), flush=True)
+
             proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
             qsub_out = proc.stdout.decode().strip()
             qsub_err = proc.stderr.decode().strip()
