@@ -58,6 +58,8 @@ class Workflow(Base):
     submissions = relationship('Submission', back_populates='workflow')
     variable_definitions = relationship('VarDefinition', back_populates='workflow')
     root_archive = relationship('Archive', back_populates='workflow', uselist=False)
+    iterations = relationship(
+        'Iteration', back_populates='workflow', order_by='Iteration.order_id')
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
@@ -133,7 +135,6 @@ class Workflow(Base):
         self._directory = str(directory)
         self.profile_files = [i.relative_to(self.directory) for i in profile_files]
         self.create_time = datetime.now()
-        self.loop_iterations = loop_iterations
         self.pre_commands = pre_commands
         self.variable_definitions = [
             VarDefinition(name=k, **v) for k, v in var_definitions.items()
@@ -176,6 +177,10 @@ class Workflow(Base):
 
         self.command_groups = cmd_groups
 
+        self.loop_iterations = loop_iterations
+        for i in range(self.loop_iterations):
+            self.iterations.append(Iteration(i))
+
         self.validate(archive_objs)
         self._execute_pre_commands()
         self.do_root_archive()
@@ -208,6 +213,10 @@ class Workflow(Base):
         msg = ('Cannot find variable definition with '
                'name "{}"'.format(variable_name))
         raise ValueError(msg)
+
+    @property
+    def first_iteration(self):
+        return self.iterations[0]
 
     @property
     def profile_files(self):
@@ -862,7 +871,7 @@ class Submission(Base):
         for i in self.workflow.command_groups:
             CommandGroupSubmission(i, self)
 
-        self.resolve_variable_values(self.workflow.directory, iter_idx=0)
+        self.resolve_variable_values(self.workflow.directory, self.first_iteration)
 
         # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
         # `resolve_variable_values`:
@@ -871,9 +880,9 @@ class Submission(Base):
 
         # `Task`s must be generated after `SchedulerGroup`s:
         for cg_sub in self.command_group_submissions:
-            for iter_idx in range(self.workflow.loop_iterations):
+            for iteration in self.workflow.iterations:
                 for task_num in range(cg_sub.num_outputs):
-                    Task(cg_sub, task_num, iter_idx)
+                    Task(cg_sub, task_num, iteration)
 
     @reconstructor
     def init_on_load(self):
@@ -920,7 +929,7 @@ class Submission(Base):
                 for cg in cmd_groups:
                     for cg_sub in self.command_group_submissions:
                         if cg_sub.command_group is cg:
-                            for i in cg_sub.get_directories(iter_idx=0):
+                            for i in cg_sub.get_directories(self.first_iteration):
                                 if i not in working_dirs:
                                     working_dirs.append(i)
 
@@ -933,13 +942,17 @@ class Submission(Base):
 
             self.alt_scratch_dir_name = alt_dirname
 
-    def get_working_directories(self, iter_idx):
+    def get_working_directories(self, iteration):
         dirs = []
         for cg_sub in self.command_group_submissions:
-            for i in cg_sub.get_directories(iter_idx):
+            for i in cg_sub.get_directories(iteration):
                 if i not in dirs:
                     dirs.append(i)
         return dirs
+
+    @property
+    def first_iteration(self):
+        return self.workflow.first_iteration
 
     @property
     def scheduler_groups(self):
@@ -981,7 +994,7 @@ class Submission(Base):
         sch_group_idx, _ = self.get_scheduler_group_index(command_group_submission)
         return self.scheduler_groups[sch_group_idx]
 
-    def is_variable_resolved(self, variable_definition, iter_idx, directory_var_val=None):
+    def is_variable_resolved(self, variable_definition, iteration, directory_var_val=None):
         """Returns True if the passed variable_definition has been resolved
         for this Submission and iteration."""
         # Check the variable definition is part of the workflow:
@@ -992,7 +1005,7 @@ class Submission(Base):
 
         for i in self.variable_values:
             if i.variable_definition == variable_definition:
-                if i.iteration_idx == iter_idx:
+                if i.iteration == iteration:
                     if directory_var_val:
                         if i.directory_value == directory_var_val:
                             return True
@@ -1001,42 +1014,64 @@ class Submission(Base):
 
         return False
 
-    def resolve_variable_values(self, root_directory, iter_idx):
+    def resolve_variable_values(self, root_directory, iteration):
         """Attempt to resolve as many variable values in the Workflow as
         possible."""
+
+        print('Submission.resolve_variable_values: iteration: {}'.format(iteration), flush=True)
 
         session = Session.object_session(self)
 
         # Loop through CommandGroupSubmissions in order:
         for i in self.command_group_submissions:
 
-            # VarValues representing the command group directories:
-            cg_dirs_var_vals = []
-
             dir_var = i.command_group.directory_variable
-            if not dir_var.variable_values:
+
+            # VarValues representing the resolved command group working directories:
+            cg_dirs_var_vals = []
+            cg_dirs_var_vals_other_val = []
+            for j in dir_var.variable_values:
+                if j.iteration == iteration:
+                    cg_dirs_var_vals.append(j)
+                else:
+                    cg_dirs_var_vals_other_val.append(j.value)
+
+            if cg_dirs_var_vals:
+                print(('Submission.resolve_variable_values: found existing resolved '
+                       'directory variables: {}').format(cg_dirs_var_vals), flush=True)
+
+            else:
+
+                print(('Submission.resolve_variable_values: trying to resolve directory '
+                       'variable values.'), flush=True)
 
                 # Directory variable has not yet been resolved; try:
                 try:
                     dir_var_vals_dat = dir_var.get_values(root_directory)
+                    print(('Submission.resolve_variable_values: found directories with '
+                           'values: {}.'.format(dir_var_vals_dat)), flush=True)
+
                 except UnresolvedVariableError:
                     # Move on to next command group:
                     continue
 
+                dir_var_vals_dat_new = [j for j in dir_var_vals_dat
+                                        if j not in cg_dirs_var_vals_other_val]
+
+                print(('Submission.resolve_variable_values: new directories are: '
+                       '{}.'.format(dir_var_vals_dat_new)), flush=True)
+
                 # Add VarVals:
-                for val_idx, val in enumerate(dir_var_vals_dat):
+                for val_idx, val in enumerate(dir_var_vals_dat_new):
                     cg_dirs_var_vals.append(
                         VarValue(
                             value=val,
                             order_id=val_idx,
                             var_definition=dir_var,
                             submission=self,
-                            iter_idx=iter_idx,
+                            iteration=iteration,
                         )
                     )
-
-            else:
-                cg_dirs_var_vals = dir_var.variable_values
 
             var_defns_rec = i.command_group.variable_definitions_recursive
 
@@ -1049,14 +1084,14 @@ class Submission(Base):
                     vals_dat = v['vals']
                     var_defn = self.workflow.get_variable_definition_by_name(k)
 
-                    if not self.is_variable_resolved(var_defn, iter_idx, j):
+                    if not self.is_variable_resolved(var_defn, iteration, j):
                         for val_idx, val in enumerate(vals_dat):
                             VarValue(
                                 value=val,
                                 order_id=val_idx,
                                 var_definition=var_defn,
                                 submission=self,
-                                iter_idx=iter_idx,
+                                iteration=iteration,
                                 directory_value=j
                             )
                             session.commit()
@@ -1133,8 +1168,8 @@ class Submission(Base):
                     excluded_paths.append(err_dir)
 
             # TODO: This won't work with iter_idx > 0:
-            working_dir_paths = [Path(i.value)
-                                 for i in self.get_working_directories(iter_idx=0)]
+            working_dir_paths = [
+                Path(i.value) for i in self.get_working_directories(self.first_iteration)]
 
             alt_scratch_exclusions = {i: [] for i in working_dir_paths}
             for working_dir in working_dir_paths:
@@ -1308,12 +1343,12 @@ class CommandGroupSubmission(Base):
 
         return num
 
-    def get_directory_values(self, iter_idx):
+    def get_directory_values(self, iteration):
 
-        dir_vals = [i.value for i in self.get_directories(iter_idx)]
+        dir_vals = [i.value for i in self.get_directories(iteration)]
         return dir_vals
 
-    def get_directories(self, iter_idx):
+    def get_directories(self, iteration):
         """Get the directory variable values associated with this command group
         submission and iteration."""
 
@@ -1322,7 +1357,7 @@ class CommandGroupSubmission(Base):
 
         dirs = []
         for i in dir_vars_all:
-            if i.iteration_idx == iter_idx:
+            if i.iteration == iteration:
                 if i.submission == self.submission:
                     dirs.append(i)
 
@@ -1330,7 +1365,7 @@ class CommandGroupSubmission(Base):
 
     @property
     def num_directories(self):
-        return len(self.get_directories(iter_idx=0))
+        return len(self.get_directories(iteration=self.submission.first_iteration))
 
     @property
     def scheduler_group_index(self):
@@ -1425,11 +1460,15 @@ class CommandGroupSubmission(Base):
         return js_path
 
     def write_runtime_files(self, project, task_idx, iter_idx):
+        session = Session.object_session(self)
+        iteration = session.query(Iteration).filter_by(
+            workflow_id=self.submission.workflow.id_,
+            order_id=iter_idx,
+        ).one()
+        self.queue_write_command_file(project, iteration)
+        self.write_variable_files(project, task_idx, iteration)
 
-        self.queue_write_command_file(project, iter_idx)
-        self.write_variable_files(project, task_idx, iter_idx)
-
-    def queue_write_command_file(self, project, iter_idx):
+    def queue_write_command_file(self, project, iteration):
         """Ensure the command file for this command group submission is written, ready
         to be invoked by the jobscript, and also refresh the resolved variable values
         so that when the variable files are written, they are up to date."""
@@ -1444,6 +1483,8 @@ class CommandGroupSubmission(Base):
                        'command file.'.format(context))
         written_msg = '{{}} {}: Command files already written.'.format(context)
         refresh_vals_msg = '{{}} {}: Refreshing resolved variable values.'.format(context)
+        write_dirs_msg = ('{{}} {}: Writing working directory files for '
+                          'iteration {}').format(context, iteration)
 
         blocked = True
         while blocked:
@@ -1474,22 +1515,30 @@ class CommandGroupSubmission(Base):
 
                 if not blocked:
 
+                    # This needs to happen once *per task* per CGS:
+                    print(refresh_vals_msg.format(datetime.now()), flush=True)
+                    self.submission.resolve_variable_values(project.dir_path, iteration)
+
+                    if not iteration.working_dirs_written:
+                        # This needs to happen once *per iteration* per CGS:
+                        print(write_dirs_msg.format(datetime.now()), flush=True)
+                        self.write_working_directories(project, iteration)
+                        iteration.working_dirs_written = True
+
                     if not self.commands_written:
+                        # This needs to happen once per CGS:
                         print(unblock_msg.format(datetime.now()), flush=True)
                         self.write_command_file(project)
                         self.commands_written = True
                     else:
                         print(written_msg.format(datetime.now()), flush=True)
 
-                    print(refresh_vals_msg.format(datetime.now()), flush=True)
-                    self.submission.resolve_variable_values(project.dir_path, iter_idx)
-
                     self.is_command_writing = None
                     session.commit()
 
-    def write_variable_files(self, project, task_idx, iter_idx):
+    def write_variable_files(self, project, task_idx, iteration):
 
-        task = self.get_task(task_idx, iter_idx)
+        task = self.get_task(task_idx, iteration)
         var_vals_normed = task.get_variable_values_normed()
 
         print('CGS.write_variable_files: task: {}'.format(task), flush=True)
@@ -1499,7 +1548,7 @@ class CommandGroupSubmission(Base):
         var_values_task_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(self.submission.workflow.id_),
             'submit_{}'.format(self.submission.order_id),
-            'iter_{}'.format(iter_idx),
+            'iter_{}'.format(iteration.order_id),
             'scheduler_group_{}'.format(self.scheduler_group_index[0]),
             'var_values',
             zeropad(task.scheduler_id, self.scheduler_group.max_num_tasks),
@@ -1588,21 +1637,53 @@ class CommandGroupSubmission(Base):
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
 
-    def get_task(self, task_idx, iter_idx):
-        session = Session.object_session(self)
-        task = session.query(Task).filter_by(
-            command_group_submission_id=self.id_,
-            order_id=task_idx,
-            iteration_idx=iter_idx,
-        ).one()
-        return task
+    def write_working_directories(self, project, iteration):
+        'Replace lines in the working_dirs files with actual directory paths.'
+
+        print('CGS.write_working_directories: iteration: {}'.format(iteration), flush=True)
+
+        dir_vals = self.get_directories(iteration)
+
+        wk_dirs_path = project.hf_dir.joinpath(
+            'workflow_{}'.format(self.submission.workflow.id_),
+            'submit_{}'.format(self.submission.order_id),
+            'iter_{}'.format(iteration.order_id),
+            'working_dirs_{}{}'.format(
+                self.command_group_exec_order, CONFIG['working_dirs_file_ext']),
+        )
+
+        with wk_dirs_path.open() as handle:
+            file_lns = handle.readlines()
+
+        for idx, i in enumerate(file_lns):
+            if 'REPLACE_WITH_DIR_' in i:
+                dir_idx = int(i.split('REPLACE_WITH_DIR_')[1])
+                file_lns[idx] = dir_vals[dir_idx]
+
+        print('write_working_directories: file_lns:')
+        pprint(file_lns)
+
+        with wk_dirs_path.open('w') as handle:
+            for i in file_lns:
+                handle.write(i.value + '\n')
+
+    def get_iteration(self, iter_idx):
+        for i in self.submission.workflow.iterations:
+            if i.order_id == iter_idx:
+                return i
+
+    def get_task(self, task_idx, iteration):
+        for i in self.tasks:
+            if i.order_id == task_idx and i.iteration == iteration:
+                return i
 
     def set_task_start(self, task_idx, iter_idx):
         context = 'CommandGroupSubmission.set_task_start'
         msg = '{{}} {}: Task index {} started.'.format(context, task_idx)
         start_time = datetime.now()
         print(msg.format(start_time), flush=True)
-        task = self.get_task(task_idx, iter_idx)
+        iteration = self.get_iteration(iter_idx)
+        task = self.get_task(task_idx, iteration)
         task.start_time = start_time
         print('task: {}'.format(task))
 
@@ -1611,7 +1692,8 @@ class CommandGroupSubmission(Base):
         msg = '{{}} {}: Task index {} ended.'.format(context, task_idx)
         end_time = datetime.now()
         print(msg.format(end_time), flush=True)
-        task = self.get_task(task_idx, iter_idx)
+        iteration = self.get_iteration(iter_idx)
+        task = self.get_task(task_idx, iteration)
         task.end_time = end_time
         print('task: {}'.format(task))
 
@@ -1624,11 +1706,13 @@ class CommandGroupSubmission(Base):
         # roughly the same time:
         sleep(10)
 
+        iteration = self.get_iteration(iter_idx)
+
         session = Session.object_session(self)
         task = session.query(Task).filter_by(
             command_group_submission_id=self.id_,
             order_id=task_idx,
-            iteration_idx=iter_idx,
+            iteration=iteration,
         ).one()
 
         self.command_group.archive.execute_with_lock(session=session, task=task)
@@ -1658,18 +1742,19 @@ class VarValue(Base):
     value = Column(String(255))
     order_id = Column(Integer)
     directory_value_id = Column('directory_value_id', Integer, ForeignKey('var_value.id'))
-    iteration_idx = Column(Integer)
+    iteration_id = Column(Integer, ForeignKey('iteration.id'))
 
     variable_definition = relationship('VarDefinition', back_populates='variable_values')
     submission = relationship('Submission', back_populates='variable_values')
     directory_value = relationship('VarValue', uselist=False, remote_side=id_)
+    iteration = relationship('Iteration', uselist=False)
 
-    def __init__(self, value, order_id, var_definition, submission, iter_idx,
+    def __init__(self, value, order_id, var_definition, submission, iteration,
                  directory_value=None):
 
         self.value = value
         self.order_id = order_id
-        self.iteration_idx = iter_idx
+        self.iteration = iteration
         self.variable_definition = var_definition
         self.submission = submission
         self.directory_value = directory_value
@@ -1680,14 +1765,14 @@ class VarValue(Base):
             'variable_name={}, '
             'value={}, '
             'order_id={}, '
-            'iteration_idx={}, '
+            'iteration={}, '
             'directory={}'
             ')').format(
                 self.__class__.__name__,
                 self.variable_definition.name,
                 self.value,
                 self.order_id,
-                self.iteration_idx,
+                self.iteration,
                 self.directory_value.value if self.directory_value else None,
         )
         return out
@@ -1717,7 +1802,6 @@ class Task(Base):
     end_time = Column(DateTime)
     memory = Column(Float)
     hostname = Column(String(255))
-    iteration_idx = Column(Integer)
     archive_status = Column(Enum(TaskArchiveStatus), nullable=True)
     _archive_start_time = Column('archive_start_time', DateTime, nullable=True)
     _archive_end_time = Column('archive_end_time', DateTime, nullable=True)
@@ -1726,14 +1810,18 @@ class Task(Base):
     command_group_submission_id = Column(
         Integer, ForeignKey('command_group_submission.id'))
 
+    iteration_id = Column(Integer, ForeignKey('iteration.id'))
+
     command_group_submission = relationship(
         'CommandGroupSubmission', back_populates='tasks', uselist=False)
 
     archived_task = relationship('Task', uselist=False, remote_side=id_)
 
-    def __init__(self, command_group_submission, order_id, iter_idx):
+    iteration = relationship('Iteration', uselist=False)
+
+    def __init__(self, command_group_submission, order_id, iteration):
         self.order_id = order_id
-        self.iteration_idx = iter_idx
+        self.iteration = iteration
         self.command_group_submission = command_group_submission
         self.start_time = None
         self.end_time = None
@@ -1745,14 +1833,14 @@ class Task(Base):
         out = (
             '{}('
             'order_id={}, '
-            'iteration_idx={}, '
+            'iteration={}, '
             'command_group_submission_id={}, '
             'start_time={}, '
             'end_time={}'
             ')').format(
                 self.__class__.__name__,
                 self.order_id,
-                self.iteration_idx,
+                self.iteration,
                 self.command_group_submission_id,
                 self.start_time,
                 self.end_time,
@@ -1809,7 +1897,7 @@ class Task(Base):
 
     def get_working_directory(self):
         'Get the "working directory" of this task.'
-        dir_vals = self.command_group_submission.get_directories(self.iteration_idx)
+        dir_vals = self.command_group_submission.get_directories(self.iteration)
         dirs_per_task = len(dir_vals) / self.command_group_submission.num_outputs
         dir_idx = floor(self.order_id * dirs_per_task)
         working_dir = dir_vals[dir_idx]
@@ -1961,6 +2049,35 @@ class Task(Base):
         var_vals_normed = dict(zip(only_names, only_vals_uniform))
 
         return var_vals_normed
+
+
+class Iteration(Base):
+    'Class to represent a workflow iteration.'
+
+    __tablename__ = 'iteration'
+
+    id_ = Column('id', Integer, primary_key=True)
+    workflow_id = Column(Integer, ForeignKey('workflow.id'))
+    order_id = Column(Integer)
+    working_dirs_written = Column(Boolean, default=False)
+
+    workflow = relationship('Workflow', back_populates='iterations', uselist=False)
+
+    def __init__(self, order_id):
+        self.order_id = order_id
+
+    def __repr__(self):
+        out = (
+            '{}('
+            'workflow_id={}, '
+            'order_id={}'
+            ')'
+        ).format(
+            self.__class__.__name__,
+            self.workflow_id,
+            self.order_id,
+        )
+        return out
 
 
 class SchedulerGroup(object):
