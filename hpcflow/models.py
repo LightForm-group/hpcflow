@@ -980,35 +980,6 @@ class Submission(Base):
         sch_group_idx, _ = self.get_scheduler_group_index(command_group_submission)
         return self.scheduler_groups[sch_group_idx]
 
-    def get_variable_values_by_name(self, variable_name):
-        """Get a list of VarValues for a given variable name.
-
-        TODO: this gets for all submissions?
-        """
-
-        var_defn = self.workflow.get_variable_definition_by_name(variable_name)
-
-        return var_defn.variable_values()
-
-    def get_variable_values(self, variable_definition):
-        """Get the values of a given variable definition for this
-        submission."""
-
-        var_vals = []
-        for i in self.variable_values:
-            if i.variable_definition == variable_definition:
-                var_vals.append(i)
-
-        return var_vals
-
-    def is_variable_name_resolved(self, variable_name):
-        """Returns True if the variable name refers to a variable that has
-        been resolved."""
-
-        var_defn = self.workflow.get_variable_definition_by_name(variable_name)
-
-        return self.is_variable_resolved(var_defn)
-
     def is_variable_resolved(self, variable_definition,
                              directory_var_val=None):
         """Returns True if the passed variable_definition has been resolved
