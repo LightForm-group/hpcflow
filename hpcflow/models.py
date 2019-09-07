@@ -1322,7 +1322,6 @@ class CommandGroupSubmission(Base):
     command_group_submission_iterations = relationship(
         'CommandGroupSubmissionIteration',
         back_populates='command_group_submission',
-        uselist=False,
     )
 
     def __init__(self, command_group, submission):
@@ -1732,15 +1731,8 @@ class CommandGroupSubmission(Base):
         sleep(10)
 
         iteration = self.get_iteration(iter_idx)
-
-        session = Session.object_session(self)
-        task = session.query(Task).filter_by(
-            command_group_submission_id=self.id_,
-            order_id=task_idx,
-            iteration=iteration,
-        ).one()
-
-        self.command_group.archive.execute_with_lock(session=session, task=task)
+        task = self.get_task(task_idx, iteration)
+        self.command_group.archive.execute_with_lock(task)
 
     def get_stats(self, jsonable=True):
         'Get task statistics for this command group submission.'
@@ -1982,13 +1974,14 @@ class Task(Base):
 
     def get_same_directory_tasks(self):
         """Get a list of other Tasks within the same command group that share the same
-        working directory"""
+        working directory and iteration."""
         same_dir_tasks = []
         for i in self.command_group_submission.tasks:
             if i is self:
                 continue
-            elif i.get_working_directory() is self.get_working_directory():
-                same_dir_tasks.append(i)
+            elif i.iteration == self.iteration:
+                if i.get_working_directory() is self.get_working_directory():
+                    same_dir_tasks.append(i)
 
         print('Task.get_same_directory_tasks: same_dir_tasks: {}'.format(same_dir_tasks),
               flush=True)
@@ -2134,6 +2127,19 @@ class CommandGroupSubmissionIteration(Base):
     def __init__(self, iteration, command_group_submission):
         self.iteration = iteration
         self.command_group_submission = command_group_submission
+
+    def __repr__(self):
+        out = (
+            '{}('
+            'iteration_id={}, '
+            'command_group_submission_id={}'
+            ')'
+        ).format(
+            self.__class__.__name__,
+            self.iteration_id,
+            self.command_group_submission_id,
+        )
+        return out
 
 
 class SchedulerGroup(object):

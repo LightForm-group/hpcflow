@@ -171,7 +171,7 @@ class Archive(Base):
 
         self._copy(self.workflow.directory, self.path.joinpath(archive_dir), exclude)
 
-    def execute_with_lock(self, session, task):
+    def execute_with_lock(self, task):
         """Execute the archive process of a given working directory.
 
         Parameters
@@ -183,6 +183,8 @@ class Archive(Base):
 
         print('Archive.execute_with_lock: task.is_archive_required: {}'.format(
             task.is_archive_required()))
+
+        session = Session.object_session(self)
 
         cg_sub = task.command_group_submission
         directory_value = task.get_working_directory()
