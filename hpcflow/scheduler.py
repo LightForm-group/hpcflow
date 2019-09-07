@@ -125,7 +125,7 @@ class SunGridEngine(Scheduler):
         ]
 
         if alternate_scratch_dir:
-            alt_scratch_exc_path = '$SUBMIT_DIR/{}_{}_$TASK_IDX{}'.format(
+            alt_scratch_exc_path = '$ITER_DIR/{}_{}_$TASK_IDX{}'.format(
                 FILE_NAMES['alt_scratch_exc_file'],
                 command_group_order,
                 FILE_NAMES['alt_scratch_exc_file_ext'],

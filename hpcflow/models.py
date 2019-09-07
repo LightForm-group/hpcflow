@@ -240,7 +240,11 @@ class Workflow(Base):
 
     @property
     def has_alternate_scratch(self):
-        return any([i.alternate_scratch for i in self.command_groups])
+        return bool(self.all_alternate_scratch)
+
+    @property
+    def all_alternate_scratch(self):
+        return [i.alternate_scratch for i in self.command_groups if i.alternate_scratch]
 
     @property
     def directory(self):
@@ -884,7 +888,9 @@ class Submission(Base):
         # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
         # `resolve_variable_values`:
         self._scheduler_groups = self.get_scheduler_groups()
-        self._make_alternate_scratch_dirs()
+
+        if self.workflow.has_alternate_scratch:
+            self._make_alternate_scratch_dirs()
 
         # `Task`s must be generated after `SchedulerGroup`s:
         for cg_sub in self.command_group_submissions:
@@ -900,58 +906,31 @@ class Submission(Base):
         self._scheduler_groups = self.get_scheduler_groups()
 
     def _make_alternate_scratch_dirs(self):
+        'Create a new directory on each alternate scratch for this submission.'
 
-        if self.workflow.has_alternate_scratch:
-            # Create new directory on alternate scratch for this submission.
+        alt_scratches = self.workflow.all_alternate_scratch
 
-            # Get unique alternate scratches and the associated command groups
-            alt_scratches = {}
-            for cg in self.workflow.command_groups:
-                if cg.alternate_scratch:
-                    if cg.alternate_scratch in alt_scratches:
-                        alt_scratches[cg.alternate_scratch].append(cg)
-                    else:
-                        alt_scratches.update({cg.alternate_scratch: [cg]})
-
-            # Find a suitable alternate scratch directory name for this submission:
-            count = 0
-            MAX_COUNT = 10
-            hex_length = 10
+        # Find a suitable alternate scratch directory name for this submission:
+        count = 0
+        MAX_COUNT = 10
+        hex_length = 10
+        alt_dirname = get_random_hex(hex_length)
+        while True:
+            if all([not i.joinpath(alt_dirname).exists() for i in alt_scratches]):
+                break
             alt_dirname = get_random_hex(hex_length)
-            while True:
-                if all([not i.joinpath(alt_dirname).exists() for i in alt_scratches]):
-                    break
-                alt_dirname = get_random_hex(hex_length)
-                count += 1
-                if count > MAX_COUNT:
-                    msg = ('Could not find a suitable alternate scratch directory name '
-                           'in {} iterations.')
-                    raise RuntimeError(msg.format(MAX_COUNT))
+            count += 1
+            if count > MAX_COUNT:
+                msg = ('Could not find a suitable alternate scratch directory name '
+                       'in {} iterations.')
+                raise RuntimeError(msg.format(MAX_COUNT))
 
-            # Make alternate scratch directories:
-            for alt_scratch, cmd_groups in alt_scratches.items():
+        # Make alternate scratch "root" directories:
+        for alt_scratch in alt_scratches:
+            alt_scratch_root = alt_scratch.joinpath(alt_dirname)
+            alt_scratch_root.mkdir(parents=False, exist_ok=False)
 
-                # Make "root" alt scratch dir:
-                alt_scratch_root = alt_scratch.joinpath(alt_dirname)
-                alt_scratch_root.mkdir(parents=False, exist_ok=False)
-
-                # Get all working directories of each alt scratch cmd_group:
-                working_dirs = []
-                for cg in cmd_groups:
-                    for cg_sub in self.command_group_submissions:
-                        if cg_sub.command_group is cg:
-                            for i in cg_sub.get_directories(self.first_iteration):
-                                if i not in working_dirs:
-                                    working_dirs.append(i)
-
-                for working_dir in working_dirs:
-                    if working_dir.value == '.':
-                        # Already made "root" dir.
-                        continue
-                    alt_scratch_w_dir = alt_scratch_root.joinpath(working_dir.value)
-                    alt_scratch_w_dir.mkdir(parents=True, exist_ok=False)
-
-            self.alt_scratch_dir_name = alt_dirname
+        self.alt_scratch_dir_name = alt_dirname
 
     def get_working_directories(self, iteration):
         dirs = []
@@ -1112,7 +1091,7 @@ class Submission(Base):
     def write_submit_dirs(self, hf_dir):
         """Write the directory structure necessary for this submission."""
 
-        # Check scheduler output directories are present:
+        # Ensure scheduler output and error directories exist, if specified:
         for cg_sub in self.command_group_submissions:
             root_dir = self.workflow.directory
             out_dir = root_dir.joinpath(cg_sub.command_group.scheduler.output_dir)
@@ -1122,20 +1101,24 @@ class Submission(Base):
             if not err_dir.is_dir():
                 err_dir.mkdir()
 
+        # Make the workflow directory if it does not exist:
         wf_path = hf_dir.joinpath('workflow_{}'.format(self.workflow_id))
         if not wf_path.exists():
             wf_path.mkdir()
 
+        # Make the submit directory:
         submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         submit_path.mkdir()
 
         for iter_idx in range(self.workflow.loop_iterations):
 
+            # Make the iteration directory for each iteration:
             iter_path = submit_path.joinpath('iter_{}'.format(iter_idx))
             iter_path.mkdir()
 
             for idx, i in enumerate(self.scheduler_groups):
 
+                # Make the scheduler group directory for each scheduler group:
                 sg_path = iter_path.joinpath('scheduler_group_{}'.format(idx))
                 sg_path.mkdir()
 
@@ -1153,68 +1136,18 @@ class Submission(Base):
                     wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(
                         cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']))
 
+                    # Make the working directory template files for each cmd group:
                     with wk_dirs_path.open('w') as handle:
                         for dir_path in all_dir_slots:
                             handle.write('{}\n'.format(dir_path))
 
+                # Make the variable values directories for each scheduler group:
                 var_values_path = sg_path.joinpath('var_values')
                 var_values_path.mkdir()
-
                 for j in range(1, i.max_num_tasks + 1):
                     j_fmt = zeropad(j, i.max_num_tasks + 1)
                     vv_j_path = var_values_path.joinpath(j_fmt)
                     vv_j_path.mkdir()
-
-        if self.workflow.has_alternate_scratch:
-
-            # List of Paths to exclude, relative to `self.workflow.directory`:
-            excluded_paths = [
-                Path(CONFIG['hpcflow_directory'])] + self.workflow.profile_files
-
-            for cg_sub in self.command_group_submissions:
-                scheduler = cg_sub.command_group.scheduler
-                out_dir = Path(scheduler.output_dir)
-                err_dir = Path(scheduler.error_dir)
-                if out_dir not in excluded_paths:
-                    excluded_paths.append(out_dir)
-                if err_dir not in excluded_paths:
-                    excluded_paths.append(err_dir)
-
-            # TODO: This won't work with iter_idx > 0:
-            working_dir_paths = [
-                Path(i.value) for i in self.get_working_directories(self.first_iteration)]
-
-            alt_scratch_exclusions = {i: [] for i in working_dir_paths}
-            for working_dir in working_dir_paths:
-                for exc_path in excluded_paths:
-                    try:
-                        exc_path.relative_to(working_dir)
-                        alt_scratch_exclusions[working_dir].append(exc_path)
-                    except ValueError:
-                        continue
-
-            for cg_sub_idx, cg_sub in enumerate(self.command_group_submissions):
-                if cg_sub.command_group.alternate_scratch:
-                    for task in cg_sub.tasks:
-                        exc_list_path = submit_path.joinpath(
-                            '{}_{}_{}{}'.format(
-                                FILE_NAMES['alt_scratch_exc_file'],
-                                cg_sub.command_group_exec_order,
-                                task.order_id,
-                                FILE_NAMES['alt_scratch_exc_file_ext'],
-                            )
-                        )
-                        working_dir = Path(task.get_working_directory_value())
-                        working_dir_abs = self.workflow.directory.joinpath(working_dir)
-                        about = (
-                            '# Alternate scratch exclusion list. Patterns are relative '
-                            'to task #{} working directory:\n'
-                            '#   "{}"\n\n'
-                        )
-                        with exc_list_path.open('w') as handle:
-                            handle.write(about.format(task.order_id, working_dir_abs))
-                            for exc_path in alt_scratch_exclusions[working_dir]:
-                                handle.write(str(exc_path) + '\n')
 
     def write_jobscripts(self, hf_dir):
 
@@ -1485,10 +1418,10 @@ class CommandGroupSubmission(Base):
 
     def write_runtime_files(self, project, task_idx, iter_idx):
         iteration = self.get_iteration(iter_idx)
-        self.queue_write_command_file(project, iteration)
+        self.queue_write_command_file(project, task_idx, iteration)
         self.write_variable_files(project, task_idx, iteration)
 
-    def queue_write_command_file(self, project, iteration):
+    def queue_write_command_file(self, project, task_idx, iteration):
         """Ensure the command file for this command group submission is written, ready
         to be invoked by the jobscript, and also refresh the resolved variable values
         so that when the variable files are written, they are up to date."""
@@ -1505,6 +1438,10 @@ class CommandGroupSubmission(Base):
         refresh_vals_msg = '{{}} {}: Refreshing resolved variable values.'.format(context)
         write_dirs_msg = ('{{}} {}: Writing working directory files for '
                           'iteration {}').format(context, iteration)
+        write_as_msg = ('{{}} {}: Writing alternate scratch exclusion list for '
+                        'task_idx {}.').format(context, task_idx)
+        make_alt_msg = ('{{}} {}: Making alternate scratch working '
+                        'directories.'.format(context))
 
         blocked = True
         while blocked:
@@ -1542,11 +1479,24 @@ class CommandGroupSubmission(Base):
                     print(refresh_vals_msg.format(datetime.now()), flush=True)
                     self.submission.resolve_variable_values(project.dir_path, iteration)
 
+                    # This needs to happen once *per task* per CGS (if it has AS):
+                    if self.command_group.alternate_scratch:
+                        print(write_as_msg.format(datetime.now()), flush=True)
+                        task = self.get_task(task_idx, iteration)
+                        self.write_alt_scratch_exclusion_list(project, task, iteration)
+
                     cg_sub_iter = self.get_command_group_submission_iteration(iteration)
                     if not cg_sub_iter.working_dirs_written:
-                        # This needs to happen once *per iteration* per CGS:
+
+                        # These need to happen once *per iteration* per CGS:
+
                         print(write_dirs_msg.format(datetime.now()), flush=True)
                         self.write_working_directories(project, iteration)
+
+                        if self.command_group.alternate_scratch:
+                            print(make_alt_msg.format(datetime.now()), flush=True)
+                            self.make_alternate_scratch_dirs(project, iteration)
+
                         cg_sub_iter.working_dirs_written = True
 
                     if not self.commands_written:
@@ -1664,8 +1614,6 @@ class CommandGroupSubmission(Base):
     def write_working_directories(self, project, iteration):
         'Replace lines in the working_dirs files with actual directory paths.'
 
-        print('CGS.write_working_directories: iteration: {}'.format(iteration), flush=True)
-
         dir_vals = self.get_directories(iteration)
 
         wk_dirs_path = project.hf_dir.joinpath(
@@ -1689,6 +1637,69 @@ class CommandGroupSubmission(Base):
         with wk_dirs_path.open('w') as handle:
             for i in file_lns:
                 handle.write(i + '\n')
+
+    def write_alt_scratch_exclusion_list(self, project, task, iteration):
+        'Write alternate scratch exclusion files (for e.g. rsync)'
+
+        # List of Paths to exclude, relative to `self.submission.workflow.directory`:
+        excluded_paths = [
+            Path(CONFIG['hpcflow_directory'])] + self.submission.workflow.profile_files
+
+        out_dir = Path(self.command_group.scheduler.output_dir)
+        err_dir = Path(self.command_group.scheduler.error_dir)
+        if out_dir not in excluded_paths:
+            excluded_paths.append(out_dir)
+        if err_dir not in excluded_paths:
+            excluded_paths.append(err_dir)
+
+        working_dir_path = Path(task.get_working_directory_value())
+        alt_scratch_exclusions = []
+        for exc_path in excluded_paths:
+            try:
+                exc_path.relative_to(working_dir_path)
+            except ValueError:
+                continue
+            alt_scratch_exclusions.append(exc_path)
+
+        exc_list_path = project.hf_dir.joinpath(
+            'workflow_{}'.format(self.submission.workflow.id_),
+            'submit_{}'.format(self.submission.order_id),
+            'iter_{}'.format(iteration.order_id),
+            '{}_{}_{}{}'.format(
+                FILE_NAMES['alt_scratch_exc_file'],
+                self.command_group_exec_order,
+                task.order_id,
+                FILE_NAMES['alt_scratch_exc_file_ext'],
+            ),
+        )
+
+        working_dir_abs = self.submission.workflow.directory.joinpath(working_dir_path)
+        about = (
+            '# Alternate scratch exclusion list. Patterns are relative '
+            'to task #{} working directory:\n'
+            '#   "{}"\n\n'
+        )
+        with exc_list_path.open('w') as handle:
+            handle.write(about.format(task.order_id, working_dir_abs))
+            for exc_path in alt_scratch_exclusions:
+                handle.write(str(exc_path) + '\n')
+
+    def make_alternate_scratch_dirs(self, project, iteration):
+        'Generate task working directories on the alternate scratch.'
+
+        # Get task working directories:
+        working_dirs = [task.get_working_directory()
+                        for task in self.tasks if task.iteration == iteration]
+
+        alt_scratch_root = self.command_group.alternate_scratch.joinpath(
+            self.submission.alt_scratch_dir_name)
+
+        for working_dir in working_dirs:
+            if working_dir.value == '.':
+                # Already made "root" dir.
+                continue
+            alt_scratch_w_dir = alt_scratch_root.joinpath(working_dir.value)
+            alt_scratch_w_dir.mkdir(parents=True, exist_ok=False)
 
     def get_iteration(self, iter_idx):
         for i in self.submission.workflow.iterations:
