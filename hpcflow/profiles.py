@@ -212,7 +212,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         'root_archive_idx': root_arch_idx,
         'root_archive_excludes': root_arch_exc,
         'profile_files': list(profile_matches.keys()),
-        'loop_iterations': loop_iters,
+        'loop_iterations': loop_iters or 1,
     }
 
     return workflow
