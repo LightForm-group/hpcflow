@@ -3,6 +3,7 @@
 
 import re
 import os
+import enum
 from datetime import datetime
 from math import ceil, floor
 from pathlib import Path
@@ -33,6 +34,13 @@ SCHEDULER_MAP = {
     'sge': SunGridEngine,
     'direct': DirectExecution,
 }
+
+
+class IterationStatus(enum.Enum):
+
+    pending = 'pending'
+    active = 'active'
+    complete = 'complete'
 
 
 class Workflow(Base):
@@ -885,6 +893,8 @@ class Submission(Base):
                 for task_num in range(cg_sub.num_outputs):
                     Task(cg_sub, task_num, iteration)
 
+        self.first_iteration.status = IterationStatus('active')
+
     @reconstructor
     def init_on_load(self):
         self._scheduler_groups = self.get_scheduler_groups()
@@ -1475,11 +1485,7 @@ class CommandGroupSubmission(Base):
         return js_path
 
     def write_runtime_files(self, project, task_idx, iter_idx):
-        session = Session.object_session(self)
-        iteration = session.query(Iteration).filter_by(
-            workflow_id=self.submission.workflow.id_,
-            order_id=iter_idx,
-        ).one()
+        iteration = self.get_iteration(iter_idx)
         self.queue_write_command_file(project, iteration)
         self.write_variable_files(project, task_idx, iteration)
 
@@ -1529,6 +1535,9 @@ class CommandGroupSubmission(Base):
                     sleep(sleep_time)
 
                 if not blocked:
+
+                    if iteration.status == IterationStatus('pending'):
+                        iteration.status = IterationStatus('active')
 
                     # This needs to happen once *per task* per CGS:
                     print(refresh_vals_msg.format(datetime.now()), flush=True)
@@ -1739,7 +1748,8 @@ class CommandGroupSubmission(Base):
             'command_group_submission_id': self.id_,
             'command_group_id': self.command_group.id_,
             'commands': self.command_group.commands,
-            'tasks': [i.get_stats(jsonable=jsonable) for i in self.tasks]
+            'tasks': [i.get_stats(jsonable=jsonable) for i in self.tasks
+                      if i.iteration.status != IterationStatus('pending')]
         }
         return out
 
@@ -2076,6 +2086,7 @@ class Iteration(Base):
     id_ = Column('id', Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey('workflow.id'))
     order_id = Column(Integer)
+    status = Column(Enum(IterationStatus), default=IterationStatus('pending'))
 
     workflow = relationship('Workflow', back_populates='iterations', uselist=False)
     command_group_submission_iterations = relationship(
