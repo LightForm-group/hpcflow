@@ -1680,16 +1680,15 @@ class CommandGroupSubmission(Base):
             file_lns = handle.readlines()
 
         for idx, i in enumerate(file_lns):
+            new_val = i.strip()
             if 'REPLACE_WITH_DIR_' in i:
                 dir_idx = int(i.split('REPLACE_WITH_DIR_')[1])
-                file_lns[idx] = dir_vals[dir_idx]
-
-        print('write_working_directories: file_lns:')
-        pprint(file_lns)
+                new_val = dir_vals[dir_idx].value
+            file_lns[idx] = new_val
 
         with wk_dirs_path.open('w') as handle:
             for i in file_lns:
-                handle.write(i.value + '\n')
+                handle.write(i + '\n')
 
     def get_iteration(self, iter_idx):
         for i in self.submission.workflow.iterations:
