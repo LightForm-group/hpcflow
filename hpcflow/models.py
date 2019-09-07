@@ -462,8 +462,10 @@ class Workflow(Base):
         kill_scheduler_ids = []
         for sub in self.submissions:
             for cg_sub in sub.command_group_submissions:
-                if cg_sub.scheduler_job_id is not None:
-                    kill_scheduler_ids.append(cg_sub.scheduler_job_id)
+                for iteration in self.iterations:
+                    cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+                    if cg_sub_iter.scheduler_job_id is not None:
+                        kill_scheduler_ids.append(cg_sub_iter.scheduler_job_id)
 
         print('Need to kill: {}'.format(kill_scheduler_ids))
         del_cmd = ['qdel'] + [str(i) for i in kill_scheduler_ids]
@@ -1164,9 +1166,9 @@ class Submission(Base):
 
         sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
         last_submit_id = None
-        for iter_idx in range(self.workflow.loop_iterations):
+        for iteration in self.workflow.iterations:
 
-            iter_idx_var = 'ITER_IDX={}'.format(iter_idx)
+            iter_idx_var = 'ITER_IDX={}'.format(iteration.order_id)
 
             for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
 
@@ -1175,7 +1177,7 @@ class Submission(Base):
                 if last_submit_id:
 
                     # Add conditional submission:
-                    if iter_idx > 0:
+                    if iteration.order_id > 0:
                         hold_arg = '-hold_jid'
                     elif cg_sub.command_group.nesting == NestingType('hold'):
                         hold_arg = '-hold_jid'
@@ -1188,7 +1190,7 @@ class Submission(Base):
                 qsub_cmd.append(str(js_path))
 
                 print('Submitting jobscript (iteration {}) with command: {}'.format(
-                    iter_idx, ' '.join(qsub_cmd)), flush=True)
+                    iteration.order_id, ' '.join(qsub_cmd)), flush=True)
 
                 proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
                 qsub_out = proc.stdout.decode().strip()
@@ -1206,8 +1208,8 @@ class Submission(Base):
                            'found at {}. No more jobscripts will be submitted.')
                     raise ValueError(msg.format(js_path))
 
-                # TODO: include job_ids from all iterations!
-                cg_sub.scheduler_job_id = int(job_id_str)
+                cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+                cg_sub_iter.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
     def get_stats(self, jsonable=True):
@@ -1232,7 +1234,6 @@ class CommandGroupSubmission(Base):
     task_stop = Column(Integer)
     task_step = Column(Integer)
     commands_written = Column(Boolean)
-    scheduler_job_id = Column(Integer, nullable=True)
     _task_multiplicity = Column('task_multiplicity', Integer, nullable=True)
 
     command_group = relationship('CommandGroup',
@@ -2121,6 +2122,7 @@ class CommandGroupSubmissionIteration(Base):
     id_ = Column('id', Integer, primary_key=True)
     working_dirs_written = Column(Boolean, default=False)
     iteration_id = Column(Integer, ForeignKey('iteration.id'))
+    scheduler_job_id = Column(Integer, nullable=True)
     command_group_submission_id = Column(
         Integer, ForeignKey('command_group_submission.id'))
 
@@ -2142,12 +2144,14 @@ class CommandGroupSubmissionIteration(Base):
         out = (
             '{}('
             'iteration_id={}, '
-            'command_group_submission_id={}'
+            'command_group_submission_id={}, '
+            'scheduler_job_id={}'
             ')'
         ).format(
             self.__class__.__name__,
             self.iteration_id,
             self.command_group_submission_id,
+            self.scheduler_job_id,
         )
         return out
 
