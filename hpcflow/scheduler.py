@@ -45,6 +45,7 @@ class SunGridEngine(Scheduler):
         'pe',       # Parallel environment
         'l',        # Resource request
         'tc',       # Max running tasks
+        'P',        # Project name (e.g. to which account jobs are accounted against)
     ]
 
     def __init__(self, options=None, output_dir=None, error_dir=None):
