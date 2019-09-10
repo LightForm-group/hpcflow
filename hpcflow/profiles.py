@@ -130,7 +130,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     pre_commands = []
     archives = []
     root_arch_name = None
-    loop_iters = None
+    loop = None
     root_arch_exc = []
     root_arch_num = 0
     for i in all_profiles:
@@ -151,8 +151,8 @@ def parse_job_profiles(dir_path=None, profile_list=None):
                 if i.get('root_archive_excludes'):
                     root_arch_exc.extend(i['root_archive_excludes'])
 
-        if 'loop_iterations' in i:
-            loop_iters = i['loop_iterations']
+        if 'loop' in i:
+            loop = i['loop']
 
         profile_cmd_groups = []
         # Form command group list:
@@ -212,8 +212,10 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         'root_archive_idx': root_arch_idx,
         'root_archive_excludes': root_arch_exc,
         'profile_files': list(profile_matches.keys()),
-        'loop_iterations': loop_iters or 1,
     }
+
+    if loop:
+        workflow.update({'loop': loop})
 
     return workflow
 

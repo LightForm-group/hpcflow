@@ -56,7 +56,7 @@ class Workflow(Base):
     root_archive_excludes = Column(JSON, nullable=True)
     root_archive_directory = Column(String(255), nullable=True)
     _profile_files = Column('profile_files', JSON, nullable=True)
-    loop_iterations = Column(Integer)
+    loop = Column(JSON)
 
     command_groups = relationship(
         'CommandGroup',
@@ -71,7 +71,7 @@ class Workflow(Base):
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
-                 root_archive_excludes=None, profile_files=None, loop_iterations=1):
+                 root_archive_excludes=None, profile_files=None, loop=None):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -103,10 +103,21 @@ class Workflow(Base):
         profile_files : list of Path, optional
             If specified, the list of absolute file paths to the profile files used to
             generate this workflow.
-        loop_iterations : int, optional
-            Number of times the whole workflow should be repeated.
+        loop : dict, optional
+            If specified, keys are:
+                max_iterations : int
+                    Maximum number of loop iterations to submit.
+                groups : list of int, optional
+                    Which command groups to include in iterations beyond the first. If not
+                    specified, all command groups are included in the loop.
+
 
         """
+
+        if loop is None:
+            loop = {
+                'max_iterations': 1,
+            }
 
         # Command group directories must be stored internally as variables:
         for idx, i in enumerate(command_groups):
@@ -185,8 +196,8 @@ class Workflow(Base):
 
         self.command_groups = cmd_groups
 
-        self.loop_iterations = loop_iterations
-        for i in range(self.loop_iterations):
+        self.loop = loop
+        for i in range(self.loop['max_iterations']):
             self.iterations.append(Iteration(i))
 
         self.validate(archive_objs)
@@ -199,14 +210,14 @@ class Workflow(Base):
                'directory={}, '
                'pre_commands={}, '
                'root_archive_id={}, '
-               'loop_iterations={}'
+               'loop={}'
                ')').format(
             self.__class__.__name__,
             self.id_,
             self.directory,
             self.pre_commands,
             self.root_archive_id,
-            self.loop_iterations,
+            self.loop,
         )
 
         return out
@@ -1112,10 +1123,10 @@ class Submission(Base):
         submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         submit_path.mkdir()
 
-        for iter_idx in range(self.workflow.loop_iterations):
+        for iteration in self.workflow.iterations:
 
             # Make the iteration directory for each iteration:
-            iter_path = submit_path.joinpath('iter_{}'.format(iter_idx))
+            iter_path = submit_path.joinpath('iter_{}'.format(iteration.order_id))
             iter_path.mkdir()
 
             for idx, i in enumerate(self.scheduler_groups):
@@ -1211,6 +1222,8 @@ class Submission(Base):
                 cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
                 cg_sub_iter.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
+
+                # Maybe add stats jobscript in here?
 
     def get_stats(self, jsonable=True):
         'Get task statistics for this submission.'
