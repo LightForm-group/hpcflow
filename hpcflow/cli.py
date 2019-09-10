@@ -199,6 +199,21 @@ def archive(cmd_group_sub_id, task_idx, iter_idx, directory=None):
 
 @cli.command()
 @click.option('--directory', '-d')
+@click.argument('cmd_group_sub_id', type=click.INT)
+@click.argument('task_idx', type=click.INT)
+@click.argument('iter_idx', type=click.INT)
+def get_scheduler_stats(cmd_group_sub_id, task_idx, iter_idx, directory=None):
+    print('hpcflow.cli.get_scheduler_stats', flush=True)
+    api.get_scheduler_stats(
+        cmd_group_sub_id,
+        task_idx,
+        iter_idx,
+        directory
+    )
+
+
+@cli.command()
+@click.option('--directory', '-d')
 @click.option('--workflow-id', '-w', type=click.INT)
 def root_archive(workflow_id, directory=None):
     print('hpcflow.cli.root_archive', flush=True)

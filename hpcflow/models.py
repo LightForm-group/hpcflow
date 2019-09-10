@@ -1188,13 +1188,17 @@ class Submission(Base):
         wf_path = hf_dir.joinpath('workflow_{}'.format(self.workflow_id))
         submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         js_paths = []
+        js_stats_paths = []
         for cg_sub in self.command_group_submissions:
-            js_path_i = cg_sub.write_jobscript(dir_path=submit_path)
+            js_path_i, js_stats_path_i = cg_sub.write_jobscript(dir_path=submit_path)
             js_paths.append(js_path_i)
+            js_stats_paths.append(js_stats_path_i)
 
-        return js_paths
+        return js_paths, js_stats_paths
 
     def submit_jobscripts(self, jobscript_paths):
+
+        js_paths, js_stat_paths = jobscript_paths
 
         sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
         last_submit_id = None
@@ -1202,7 +1206,8 @@ class Submission(Base):
 
             iter_idx_var = 'ITER_IDX={}'.format(iteration.order_id)
 
-            for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
+            for js_path, js_stat_path, cg_sub in zip(
+                js_paths, js_stat_paths, self.command_group_submissions):
 
                 cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
                 if cg_sub_iter is None:
@@ -1225,29 +1230,35 @@ class Submission(Base):
                 qsub_cmd += ['-v', iter_idx_var]
                 qsub_cmd.append(str(js_path))
 
-                print('Submitting jobscript (iteration {}) with command: {}'.format(
-                    iteration.order_id, ' '.join(qsub_cmd)), flush=True)
-
-                proc = run(qsub_cmd, stdout=PIPE, stderr=PIPE)
-                qsub_out = proc.stdout.decode().strip()
-                qsub_err = proc.stderr.decode().strip()
-                print(qsub_out, flush=True)
-                print(qsub_err, flush=True)
-
-                # Extract newly submitted job ID:
-                pattern = r'[0-9]+'
-                job_id_search = re.search(pattern, qsub_out)
-                try:
-                    job_id_str = job_id_search.group()
-                except AttributeError:
-                    msg = ('Could not retrieve the job ID from the submitted jobscript '
-                           'found at {}. No more jobscripts will be submitted.')
-                    raise ValueError(msg.format(js_path))
-
+                # Submit the jobscript:
+                job_id_str = self.submit_jobscript(qsub_cmd, js_path, iteration)
                 cg_sub_iter.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
-                # Maybe add stats jobscript in here?
+                # Submit the stats jobscript:
+                st_cmd = [sumbit_cmd, '-hold_jid_ad', last_submit_id, '-v', iter_idx_var]
+                st_cmd.append(str(js_stat_path))
+
+                job_id_str = self.submit_jobscript(st_cmd, js_stat_path, iteration)
+
+    def submit_jobscript(self, cmd, js_path, iteration):
+
+        proc = run(cmd, stdout=PIPE, stderr=PIPE)
+        qsub_out = proc.stdout.decode().strip()
+        qsub_err = proc.stderr.decode().strip()
+        print(qsub_out, flush=True)
+
+        # Extract newly submitted job ID:
+        pattern = r'[0-9]+'
+        job_id_search = re.search(pattern, qsub_out)
+        try:
+            job_id_str = job_id_search.group()
+        except AttributeError:
+            msg = ('Could not retrieve the job ID from the submitted jobscript '
+                   'found at {}. No more jobscripts will be submitted.')
+            raise ValueError(msg.format(js_path))
+
+        return job_id_str
 
     def get_stats(self, jsonable=True):
         'Get task statistics for this submission.'
@@ -1462,8 +1473,16 @@ class CommandGroupSubmission(Base):
             alternate_scratch_dir=self.alternate_scratch_dir,
             command_group_submission_id=self.id_
         )
+        js_stats_path = self.command_group.scheduler.write_stats_jobscript(
+            dir_path=dir_path,
+            workflow_directory=self.submission.workflow.directory,            
+            command_group_order=self.command_group_exec_order,
+            max_num_tasks=self.scheduler_group.max_num_tasks,
+            task_step_size=self.step_size,
+            command_group_submission_id=self.id_,
+        )
 
-        return js_path
+        return js_path, js_stats_path
 
     def write_runtime_files(self, project, task_idx, iter_idx):
         iteration = self.get_iteration(iter_idx)
@@ -1803,6 +1822,17 @@ class CommandGroupSubmission(Base):
                       if i.iteration.status != IterationStatus('pending')]
         }
         return out
+
+    def get_scheduler_stats(self, task_idx, iter_idx):
+
+        # Get scheduler job ID and scheduler task ID:
+        iteration = self.get_iteration(iter_idx)
+        cg_sub_iter = self.get_command_group_submission_iteration(iteration)
+        scheduler_job_id = cg_sub_iter.scheduler_job_id
+        task = self.get_task(task_idx, iteration)
+        task_id = task.scheduler_id
+
+        info = self.command_group.scheduler.get_scheduler_stats(scheduler_job_id, task_id)
 
 
 class VarValue(Base):

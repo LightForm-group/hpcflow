@@ -249,6 +249,34 @@ def root_archive(workflow_id, dir_path=None):
     session.close()
 
 
+def get_scheduler_stats(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
+    """Scrape completed task information from the scheduler.
+
+    Parameters
+    ----------
+    cmd_group_sub_id : int
+        ID of the command group submission for which an archive is to be
+        started.
+    task_idx : int
+        The task index to be archived (or rather, the task whose working directory
+        will be archived).
+    dir_path : str or Path, optional
+        The directory in which the Workflow will be generated. By default, this
+        is the working (i.e. invoking) directory.
+
+    """
+
+    project = Project(dir_path)
+    Session = init_db(project, check_exists=True)
+    session = Session()
+
+    cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
+    cg_sub.get_scheduler_stats(task_idx, iter_idx)
+
+    session.commit()
+    session.close()
+
+
 def get_stats(dir_path=None, workflow_id=None, jsonable=True):
     'Get task statistics (as a JSON-like dict) for a project.'
 
