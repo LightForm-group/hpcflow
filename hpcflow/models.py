@@ -924,7 +924,7 @@ class Submission(Base):
         for cg_sub in self.command_group_submissions:
             for iteration in self.workflow.iterations:
 
-                if iteration.order_id > 0:
+                if iteration.order_id > 0 and self.workflow.loop.get('groups'):
                     # For > first iteration, not all command groups need be run:
                     if cg_sub.command_group_exec_order not in self.workflow.loop['groups']:
                         continue
