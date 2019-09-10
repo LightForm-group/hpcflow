@@ -908,6 +908,12 @@ class Submission(Base):
         # `Task`s must be generated after `SchedulerGroup`s:
         for cg_sub in self.command_group_submissions:
             for iteration in self.workflow.iterations:
+
+                if iteration.order_id > 0:
+                    # For > first iteration, not all command groups need be run:
+                    if cg_sub.command_group_exec_order not in self.workflow.loop['groups']:
+                        continue
+
                 CommandGroupSubmissionIteration(iteration, cg_sub)
                 for task_num in range(cg_sub.num_outputs):
                     Task(cg_sub, task_num, iteration)
@@ -1183,6 +1189,10 @@ class Submission(Base):
 
             for js_path, cg_sub in zip(jobscript_paths, self.command_group_submissions):
 
+                cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+                if cg_sub_iter is None:
+                    continue
+
                 qsub_cmd = [sumbit_cmd]
 
                 if last_submit_id:
@@ -1219,7 +1229,6 @@ class Submission(Base):
                            'found at {}. No more jobscripts will be submitted.')
                     raise ValueError(msg.format(js_path))
 
-                cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
                 cg_sub_iter.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
