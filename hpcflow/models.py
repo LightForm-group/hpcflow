@@ -518,6 +518,21 @@ class CommandGroup(Base):
 
     _scheduler_obj = None
 
+    def __repr__(self):
+        out = (
+            '{}('
+            'commands={!r}, '
+            'is_job_array={!r}, '
+            'nesting={!r}'
+            ')'
+        ).format(
+            self.__class__.__name__,
+            self.commands,
+            self.is_job_array,
+            self.nesting,
+        )
+        return out
+
     def __init__(self, commands, directory_var, is_job_array=True,
                  exec_order=None, nesting=None, modules=None, scheduler=None,
                  profile_name=None, profile_order=None, archive=None,
@@ -1279,6 +1294,17 @@ class CommandGroupSubmission(Base):
         'CommandGroupSubmissionIteration',
         back_populates='command_group_submission',
     )
+
+    def __repr__(self):
+        out = (
+            '{}('
+            'command_group={!r}, '
+            'submission_id={!r})').format(
+            self.__class__.__name__,
+            self.command_group,
+            self.submission_id,
+        )
+        return out
 
     def __init__(self, command_group, submission):
 
