@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from subprocess import run, PIPE
+from pprint import pprint
 
 from hpcflow import CONFIG, FILE_NAMES
 from hpcflow._version import __version__
@@ -31,6 +32,8 @@ class SunGridEngine(Scheduler):
 
     _NAME = 'sge'
     SHEBANG = '#!/bin/bash --login'
+
+    STATS_DELIM = '==============================================================\n'
 
     # Options that determine how to set the output/error directories:
     STDOUT_OPT = 'o'
@@ -276,14 +279,25 @@ class SunGridEngine(Scheduler):
         cmd = ['/opt/site/sge/bin/lx-amd64/qacct', '-j', str(scheduler_job_id)]
         proc = run(cmd, stdout=PIPE, stderr=PIPE)
         out = proc.stdout.decode().strip()
-        err = proc.stderr.decode().strip()
-        print(out, flush=True)
-        print(err, flush=True)
+        _ = proc.stderr.decode().strip()
 
-        return 1
+        info = {}
+        qacct = out.split(SunGridEngine.STATS_DELIM)
+        for i in qacct[1:]:
+            keep = False
+            for ln in i.splitlines():
+                key, val = ln.strip().split(None, 1)
+                val = val.strip()
+                info.update({key: val})
+                if key == 'taskid':
+                    if val == 'undefined' or int(val) == task_id:
+                        keep = True
+            if keep:
+                break
+            else:
+                info = {}
 
-    def parse_qacct(self):
-        pass
+        return info
 
 
 class DirectExecution(Scheduler):

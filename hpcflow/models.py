@@ -1240,6 +1240,7 @@ class Submission(Base):
                 st_cmd.append(str(js_stat_path))
 
                 job_id_str = self.submit_jobscript(st_cmd, js_stat_path, iteration)
+                last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
 
@@ -1834,6 +1835,13 @@ class CommandGroupSubmission(Base):
 
         info = self.command_group.scheduler.get_scheduler_stats(scheduler_job_id, task_id)
 
+        maxvmem = float(info['maxvmem'].split('MB')[0])
+        hostname = info['hostname']
+        wallclock = int(info['ru_wallclock'].split('s')[0])
+        
+        task.memory = maxvmem
+        task.hostname = hostname
+        task.wallclock = wallclock
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""
@@ -1909,6 +1917,7 @@ class Task(Base):
     end_time = Column(DateTime)
     memory = Column(Float)
     hostname = Column(String(255))
+    wallclock = Column(Integer)
     archive_status = Column(Enum(TaskArchiveStatus), nullable=True)
     _archive_start_time = Column('archive_start_time', DateTime, nullable=True)
     _archive_end_time = Column('archive_end_time', DateTime, nullable=True)
@@ -2029,6 +2038,7 @@ class Task(Base):
             'archived_task_id': self.archived_task_id,
             'memory': self.memory,
             'hostname': self.hostname,
+            'wallclock': self.wallclock,
             'working_directory': self.get_working_directory_value(),
             'archive_status': self.archive_status,
             'iteration': self.iteration.order_id,
