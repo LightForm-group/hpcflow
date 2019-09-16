@@ -1835,7 +1835,10 @@ class CommandGroupSubmission(Base):
 
         info = self.command_group.scheduler.get_scheduler_stats(scheduler_job_id, task_id)
 
-        maxvmem = float(info['maxvmem'].split('MB')[0])
+        if 'MB' in info['maxvmem']:
+            maxvmem = float(info['maxvmem'].split('MB')[0])
+        elif 'GB' in info['maxvmem']:
+            maxvmem = float(info['maxvmem'].split('GB')[0])
         hostname = info['hostname']
         wallclock = int(info['ru_wallclock'].split('s')[0])
         
