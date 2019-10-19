@@ -260,6 +260,7 @@ class SunGridEngine(Scheduler):
         cmd_exec = ['hpcflow get-scheduler-stats {}'.format(set_task_args)]
 
         opt = self.get_formatted_options(max_num_tasks, task_step_size, user_opt=False)
+        opt.append('#$ -l short')  # Temp (should be a profile option)
 
         js_lines = ([SunGridEngine.SHEBANG, ''] +
                     about_msg + [''] +
