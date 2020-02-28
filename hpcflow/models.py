@@ -806,6 +806,17 @@ class VarDefinition(Base):
 
         """
 
+        print('VarDefinition.get_multiplicity: self: {}'.format(self), flush=True)
+
+        # First check if the variable is resolved.
+        var_values = [i for i in self.variable_values if i.submission == submission]
+
+        print('VarDefinition.get_multiplicity: var_values: {}'.format(var_values), flush=True)
+
+        # if var_values:
+        #     var_length = len(var_values)
+
+        # else:
         var_length = None
 
         if self.data:
@@ -925,6 +936,10 @@ class Submission(Base):
         # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
         # `resolve_variable_values`:
         self._scheduler_groups = self.get_scheduler_groups()
+
+        for i in self.command_group_submissions:
+            print('Submission.__init__: scheduler_group: {}'.format(
+                i.scheduler_group), flush=True)
 
         if self.workflow.has_alternate_scratch:
             self._make_alternate_scratch_dirs()
@@ -1056,9 +1071,9 @@ class Submission(Base):
         session = Session.object_session(self)
 
         # Loop through CommandGroupSubmissions in order:
-        for i in self.command_group_submissions:
+        for i in self.workflow.command_groups:
 
-            dir_var = i.command_group.directory_variable
+            dir_var = i.directory_variable
 
             # VarValues representing the resolved command group working directories:
             cg_dirs_var_vals = []
@@ -1070,6 +1085,7 @@ class Submission(Base):
                     cg_dirs_var_vals_other_val.append(j.value)
 
             if cg_dirs_var_vals:
+                pass
                 print(('Submission.resolve_variable_values: found existing resolved '
                        'directory variables: {}').format(cg_dirs_var_vals), flush=True)
 
@@ -1108,19 +1124,44 @@ class Submission(Base):
                         )
                     )
 
-            var_defns_rec = i.command_group.variable_definitions_recursive
+            var_defns_rec = i.variable_definitions_recursive
+
+            print(('Submission.resolve_variable_values: cg_dirs_var_vals: '
+                   '{}.'.format(cg_dirs_var_vals)), flush=True)
 
             for j in cg_dirs_var_vals:
 
+                print(('Submission.resolve_variable_values: dir var val: '
+                       '{}.'.format(j)), flush=True)
+
                 var_vals_dat = resolve_variable_values(var_defns_rec, Path(j.value))
 
+                print(('Submission.resolve_variable_values: var_vals_dat: '
+                       '{}.'.format(var_vals_dat)), flush=True)
+
                 for k, v in var_vals_dat.items():
+
+                    print(('Submission.resolve_variable_values: var_vals_dat k: '
+                           '{}; v: {}.'.format(k, v)), flush=True)
 
                     vals_dat = v['vals']
                     var_defn = self.workflow.get_variable_definition_by_name(k)
 
+                    print(('Submission.resolve_variable_values: vals_dat '
+                           '{}.'.format(vals_dat)), flush=True)
+                    print(('Submission.resolve_variable_values: var_defn '
+                           '{}.'.format(var_defn)), flush=True)
+
                     if not self.is_variable_resolved(var_defn, iteration, j):
+
+                        print(('Submission.resolve_variable_values: {} not resolved...'.format(
+                            var_defn)), flush=True)
+
                         for val_idx, val in enumerate(vals_dat):
+
+                            print(('Submission.resolve_variable_values: val: {}...'.format(
+                                val)), flush=True)
+
                             VarValue(
                                 value=val,
                                 order_id=val_idx,
@@ -1405,6 +1446,8 @@ class CommandGroupSubmission(Base):
                 if i.submission == self.submission:
                     dirs.append(i)
 
+        # dirs = [i for idx, i in enumerate(dirs) if idx in self.task_range_idx]
+
         return dirs
 
     @property
@@ -1473,6 +1516,9 @@ class CommandGroupSubmission(Base):
             var_length = i.get_multiplicity(self.submission)
             task_multi_all.update({i.name: var_length})
 
+        print('CGS._get_task_multiplicity.task_multi_all: {}'.format(
+            task_multi_all), flush=True)
+
         if task_multi_all:
             uniq_lens = set(task_multi_all.values())
             num_uniq_lens = len(uniq_lens)
@@ -1486,6 +1532,8 @@ class CommandGroupSubmission(Base):
                 raise ValueError('bad 5!')
         else:
             task_multi = 1
+
+        print('CGS._get_task_multiplicity.task_multi: {}'.format(task_multi), flush=True)
 
         return task_multi
 
@@ -2330,11 +2378,17 @@ class SchedulerGroup(object):
         num_outs_all = []
 
         # Get num_outputs for all previous cg subs in this scheduler group
-        for cg_sub in self.command_group_submissions:
+        for idx, cg_sub in enumerate(self.command_group_submissions):
+
+            print('SchedulerGroup._get_num_outputs: cg_sub idx: {}'.format(idx), flush=True)
 
             # Number of outputs depend on task multiplicity, `is_job_array` and `nesting`
             is_job_array = cg_sub.command_group.is_job_array
             nesting = cg_sub.command_group.nesting
+
+            print('SchedulerGroup._get_num_outputs: is_job_array: {}'.format(
+                is_job_array), flush=True)
+            print('SchedulerGroup._get_num_outputs: nesting: {}'.format(nesting), flush=True)
 
             if nesting == NestingType('nest'):  # or first_cmd_group:
                 num_outs = num_outs_prev
@@ -2346,10 +2400,19 @@ class SchedulerGroup(object):
             if is_job_array:
                 if nesting in [NestingType('hold'), None]:
                     num_outs *= cg_sub.num_directories
+                    print('SchedulerGroup._get_num_outputs: cg_sub.num_directories: {}'.format(
+                        cg_sub.num_directories), flush=True)
                 num_outs *= cg_sub.task_multiplicity
+                print('SchedulerGroup._get_num_outputs: cg_sub.task_multiplicity: {}'.format(
+                    cg_sub.task_multiplicity), flush=True)
+
+            print('SchedulerGroup._get_num_outputs: num_outs: {}'.format(num_outs), flush=True)
 
             num_outs_all.append(num_outs)
             num_outs_prev = num_outs
+
+        print('SchedulerGroup._get_num_outputs: num_outs_all: {}'.format(
+            num_outs_all), flush=True)
 
         return num_outs_all
 
