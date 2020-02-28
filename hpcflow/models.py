@@ -1691,11 +1691,15 @@ class CommandGroupSubmission(Base):
 
             lns_fds.append('\t{}< {}'.format(fd_idx, var_file_path))
 
+        lns_cmd_print = ['\tprintf "{}\n" >> $LOG_PATH 2>&1'.format(
+            i.strip('\t')) for i in lns_cmd]
+
         if self.command_group.variable_definitions:
             cmd_lns = (about_msg + [''] +
                        lns_task_id_pad + [''] +
                        lns_while_start + [''] +
                        lns_read + [''] +
+                       lns_cmd_print + [''] +
                        lns_cmd + [''] +
                        lns_while_end +
                        lns_fds + [''])
