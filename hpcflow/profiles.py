@@ -345,7 +345,9 @@ def resolve_job_profile(job_profile_path, filename_var_values,
 
         merged_profile.update(**i)
 
-    merged_profile.pop('inherits')
+    if 'inherits' in merged_profile:
+        merged_profile.pop('inherits')
+
     merged_profile['variables'] = merged_vars
     merged_profile['scheduler_options'] = merged_opts
 
