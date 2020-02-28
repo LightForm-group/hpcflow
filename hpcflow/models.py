@@ -284,7 +284,7 @@ class Workflow(Base):
             if i.cloud_provider != CloudProvider.null:
                 i.cloud_provider.check_access()
 
-    def add_submission(self, project, task_ranges=None):
+    def add_submission(self, project, task_range=None, stats=True):
         """Add a new submission to this Workflow.
 
         Parameters
@@ -356,10 +356,12 @@ class Workflow(Base):
 
         """
 
-        submission = Submission(self)  # Generate CGSs and Tasks
+        # print('Workflow.add_submission: task_range: {}'.format(task_range), flush=True)
+
+        submission = Submission(self, task_range)  # Generate CGSs and Tasks
         submission.write_submit_dirs(project.hf_dir)
         js_paths = submission.write_jobscripts(project.hf_dir)
-        submission.submit_jobscripts(js_paths)
+        submission.submit_jobscripts(js_paths, stats)
 
         return submission
 
@@ -902,16 +904,19 @@ class Submission(Base):
 
     variable_values = relationship('VarValue', back_populates='submission')
 
-    def __init__(self, workflow):
+    def __init__(self, workflow, task_range):
 
         self.submit_time = datetime.now()
         self.order_id = len(workflow.submissions)
         self.workflow = workflow
 
-        for i in self.workflow.command_groups:
-            CommandGroupSubmission(i, self)
+        # print('Submission.__init__: task_range: {}'.format(task_range), flush=True)
 
         self.resolve_variable_values(self.workflow.directory, self.first_iteration)
+
+        for i in self.workflow.command_groups:
+            task_range = [1, -1, 1]  # TEMP
+            CommandGroupSubmission(i, self, task_range)
 
         # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
         # `resolve_variable_values`:
@@ -1196,7 +1201,7 @@ class Submission(Base):
 
         return js_paths, js_stats_paths
 
-    def submit_jobscripts(self, jobscript_paths):
+    def submit_jobscripts(self, jobscript_paths, stats):
 
         js_paths, js_stat_paths = jobscript_paths
 
@@ -1207,7 +1212,7 @@ class Submission(Base):
             iter_idx_var = 'ITER_IDX={}'.format(iteration.order_id)
 
             for js_path, js_stat_path, cg_sub in zip(
-                js_paths, js_stat_paths, self.command_group_submissions):
+                    js_paths, js_stat_paths, self.command_group_submissions):
 
                 cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
                 if cg_sub_iter is None:
@@ -1236,11 +1241,13 @@ class Submission(Base):
                 last_submit_id = job_id_str
 
                 # Submit the stats jobscript:
-                st_cmd = [sumbit_cmd, '-hold_jid_ad', last_submit_id, '-v', iter_idx_var]
-                st_cmd.append(str(js_stat_path))
+                if stats:
+                    st_cmd = [sumbit_cmd, '-hold_jid_ad',
+                              last_submit_id, '-v', iter_idx_var]
+                    st_cmd.append(str(js_stat_path))
 
-                job_id_str = self.submit_jobscript(st_cmd, js_stat_path, iteration)
-                last_submit_id = job_id_str
+                    job_id_str = self.submit_jobscript(st_cmd, js_stat_path, iteration)
+                    last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
 
@@ -1318,11 +1325,31 @@ class CommandGroupSubmission(Base):
         )
         return out
 
-    def __init__(self, command_group, submission):
+    def __init__(self, command_group, submission, task_range):
+
+        # print('CommandGroupSubmission.__init__: task_range: {}'.format(task_range), flush=True)
 
         self.command_group = command_group
         self.submission = submission
         self._task_multiplicity = self._get_task_multiplicity()
+        self.task_range = task_range
+
+    @property
+    def task_range(self):
+        return (self.task_start, self.task_stop, self.task_step)
+
+    @task_range.setter
+    def task_range(self, task_range):
+        self.task_start = task_range[0]
+        self.task_stop = task_range[1]
+        if len(task_range) == 3:
+            self.task_step = task_range[2]
+        else:
+            self.task_step = 1
+
+    @property
+    def task_range_idx(self):
+        return list(range(*self.task_range))
 
     @property
     def task_multiplicity(self):
@@ -1841,10 +1868,11 @@ class CommandGroupSubmission(Base):
             maxvmem = float(info['maxvmem'].split('GB')[0])
         hostname = info['hostname']
         wallclock = int(info['ru_wallclock'].split('s')[0])
-        
+
         task.memory = maxvmem
         task.hostname = hostname
         task.wallclock = wallclock
+
 
 class VarValue(Base):
     """Class to represent the evaluated value of a variable."""

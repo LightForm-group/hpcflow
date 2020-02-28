@@ -55,8 +55,7 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
 
     """
 
-    not_nones = sum(
-        [i is not None for i in [profile_list, json_file, json_str]])
+    not_nones = sum([i is not None for i in [profile_list, json_file, json_str]])
     if not_nones > 1:
         msg = ('Specify only one of `profile_list`, `json_file` or `json_str`.')
         raise ValueError(msg)
@@ -77,6 +76,9 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
     Session = init_db(project, check_exists=False)
     session = Session()
 
+    # print('workflow_dict:')
+    # pprint(workflow_dict)
+
     workflow = Workflow(directory=project.dir_path, **workflow_dict)
 
     session.add(workflow)
@@ -88,7 +90,7 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
     return workflow_id
 
 
-def submit_workflow(workflow_id, dir_path=None, task_ranges=None):
+def submit_workflow(workflow_id, dir_path=None, task_range='all'):
     """Submit (part of) a previously generated Workflow.
 
     Parameters
@@ -96,9 +98,14 @@ def submit_workflow(workflow_id, dir_path=None, task_ranges=None):
     workflow_id : int
         The ID of the Workflow to submit, as in the local database.
     dir_path : str or Path, optional
-        The directory in which the Workflow exists. By default, this is the
-        working (i.e. invoking) directory.
-    task_ranges : list of tuple of int, optional
+        The directory in which the Workflow exists. By default, this is the working (i.e.
+        invoking) directory.
+    task_range : (list of int) or str, optional
+        Specify which tasks from the initial command group to submit. If a list, it must
+        have either two or three elements; if it has two elements, these signify the first
+        and last tasks, inclusively, to submit. By default, the task step size is one, but
+        this can be chosen as a third list entry. If a string "all", all tasks are
+        submitted.
 
     TODO: do validation of task_ranges here? so models.workflow.add_submission
     always receives a definite `task_ranges`? What about if the number is
@@ -106,12 +113,20 @@ def submit_workflow(workflow_id, dir_path=None, task_ranges=None):
 
     """
 
+    if task_range == 'all' or task_range is None:
+        task_range = [1, -1, 1]
+    if len(task_range) == 2:
+        task_range.append(1)
+
+    # print('api.submit_workflow: task_range: {}'.format(task_range), flush=True)
+
     project = Project(dir_path)
     Session = init_db(project, check_exists=True)
     session = Session()
 
     workflow = session.query(Workflow).get(workflow_id)
-    submission = workflow.add_submission(project, task_ranges)
+    stats = False
+    submission = workflow.add_submission(project, task_range, stats)
 
     session.commit()
 

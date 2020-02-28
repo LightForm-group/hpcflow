@@ -110,6 +110,7 @@ def validate_task_ranges(ctx, param, value):
         task_range = [task_start, task_stop, task_step]
         task_ranges.append(task_range)
 
+    task_ranges = task_ranges[0]  # For now - no channels.
     return task_ranges
 
 
@@ -272,7 +273,7 @@ def submit(directory=None, workflow_id=None, task_ranges=None, profiles=None,
     existing_ids = api.get_workflow_ids(directory)
     submit_args = {
         'dir_path': directory,
-        'task_ranges': task_ranges,
+        'task_range': task_ranges,
     }
 
     if workflow_id:
