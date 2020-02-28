@@ -504,6 +504,7 @@ class CommandGroup(Base):
     exec_order = Column(Integer)
     nesting = Column(Enum(NestingType), nullable=True)
     modules = Column(JSON, nullable=True)
+    sources = Column(JSON, nullable=True)
     _scheduler = Column('scheduler', JSON)
     profile_name = Column(String(255), nullable=True)
     profile_order = Column(Integer, nullable=True)
@@ -536,8 +537,8 @@ class CommandGroup(Base):
         return out
 
     def __init__(self, commands, directory_var, is_job_array=True,
-                 exec_order=None, nesting=None, modules=None, scheduler=None,
-                 profile_name=None, profile_order=None, archive=None,
+                 exec_order=None, nesting=None, modules=None, sources=None,
+                 scheduler=None, profile_name=None, profile_order=None, archive=None,
                  archive_excludes=None, archive_directory=None, alternate_scratch=None):
         """Method to initialise a new CommandGroup.
 
@@ -570,6 +571,8 @@ class CommandGroup(Base):
             List of modules that are to be loaded using the `module load`
             command, in order to ensure successful execution of the commands.
             By default set to `None`, such that no modules are loaded.
+        sources : list of str, optional
+            List of scripts to source.
         scheduler : dict, optional
             Scheduler type and options to be passed directly to the scheduler. By default,
             `None`, in which case the DirectExecution scheduler is used and no additional
@@ -599,6 +602,7 @@ class CommandGroup(Base):
         self.exec_order = exec_order
         self.nesting = nesting
         self.modules = modules
+        self.sources = sources
         self.scheduler = scheduler
         self.directory_variable = directory_var
         self.profile_name = profile_name
@@ -1497,13 +1501,14 @@ class CommandGroupSubmission(Base):
             max_num_tasks=self.scheduler_group.max_num_tasks,
             task_step_size=self.step_size,
             modules=self.command_group.modules,
+            sources=self.command_group.sources,
             archive=self.command_group.archive is not None,
             alternate_scratch_dir=self.alternate_scratch_dir,
             command_group_submission_id=self.id_
         )
         js_stats_path = self.command_group.scheduler.write_stats_jobscript(
             dir_path=dir_path,
-            workflow_directory=self.submission.workflow.directory,            
+            workflow_directory=self.submission.workflow.directory,
             command_group_order=self.command_group_exec_order,
             max_num_tasks=self.scheduler_group.max_num_tasks,
             task_step_size=self.step_size,

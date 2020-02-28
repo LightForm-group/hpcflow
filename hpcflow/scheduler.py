@@ -87,7 +87,7 @@ class SunGridEngine(Scheduler):
         return opts
 
     def write_jobscript(self, dir_path, workflow_directory, command_group_order,
-                        max_num_tasks, task_step_size, modules, archive,
+                        max_num_tasks, task_step_size, modules, sources, archive,
                         alternate_scratch_dir, command_group_submission_id):
         """Write the jobscript.
 
@@ -181,6 +181,8 @@ class SunGridEngine(Scheduler):
 
         if modules:
             loads = [''] + ['module load {}'.format(i) for i in sorted(modules)] + ['']
+        elif sources:
+            loads = [''] + ['source {}'.format(i) for i in sorted(sources)] + ['']
         else:
             loads = []
 
