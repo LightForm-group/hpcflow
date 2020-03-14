@@ -1,0 +1,608 @@
+## Matflow and Surfalex work
+
+Reason for splitting workflows and using `extends`:
+
+* When testing things out, don't want to have to repeat earlier tasks where output would be identical.
+
+Three stages to/ value of work:
+1. Clearly exhibiting choice of methods, parameters and data analysis 
+2. Enabling others to in principle repeat and modify the workflows with little effort
+3. Enabling others to easily develop their own workflows from scratch
+
+Numbers 2. and 3. will take some extra time.
+
+
+
+## `hpcflow`
+
+### Development restrictions
+
+For now, we will only support workflows with the following limitations:
+
+* All workflows are submitted as job arrays
+* All workflows are submitted with the SGE scheduler
+* All workflows are submitted locally
+
+### Scenarios
+
+The following scenarios demonstrate minimum-working examples of `hpcflow` workflows.
+
+Assume also that the scheduler redirects standard output and standard error to the files `stdout` and `stderr`, respectively.
+
+<u>Dummy commands</u>
+
+| Dummy command      | Input file(s)                             | Output file(s)                               |
+| ------------------ | ----------------------------------------- | -------------------------------------------- |
+| `doSomething`      | {`infile_A`, `infile_B`, ..., `infile_I`} | `outfile`                                    |
+| `splitSomething`   | `outfile`                                 | {`outfile_1`, `outfile_2`, ..., `outfile_i`} |
+| `processSomething` | `outfile`  or `outfile_i`                 | -                                            |
+
+
+
+#### x. Root directory; no variables
+
+<u>Notes</u>
+
+* Most basic workflow.
+* The single command group is executed in the project root directory.
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - commands:
+      - doSomething -a input_A -b input_B
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+infile_A
+infile_B
+```
+
+<u>Directory structure --- final</u>
+
+```project/
+profile.yml
+infile_A
+infile_B
+outfile
+stdout
+stderr
+```
+
+
+
+#### x. Root directory; file contents variable
+
+<u>Notes</u>
+
+* Variable values are taken from lines in a specified file
+* The single command group is executed in the project root directory.
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - commands:
+      - doSomething -a <<input_A_variable>> -b input_B
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+inf_file_A_variable.txt
+infile_A
+infile_B
+```
+
+<u>Directory structure --- final</u>
+
+```project/
+profile.yml
+inf_file_A_variable.txt
+infile_B
+outfile
+stdout
+stderr
+```
+
+
+
+#### x. Root directory; regular expression (regex) variables
+
+<u>Notes</u>
+
+* Identical to the above simple workflow, but the files names of the input files are *variables* that are resolved using regular expressions, rather than hard-coded. In this case, the regular expressions match the file extensions `extA` and `extB`.
+* As above, the commands are executed in the project root directory.
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - commands:
+      - doSomething -a <<input_A>> -b <<input_B>>
+
+variables:
+  input_A:
+    file_regex:
+      pattern: '(\w+\.extA)$'
+  input_B:
+    file_regex:
+      pattern: '(\w+\.extB)$'      
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+infile.extA
+infile.extB
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+infile.extA
+infile.extB
+outfile
+stdout
+stderr
+```
+
+
+
+#### x. [low priority] Root directory; multiple input sets
+
+<u>Notes</u>
+
+* DOES NOT YET WORK because...
+  * We don't yet support resolving nested variables within regex patterns.
+* Like the above workflow, but multiple input file sets are used in the root directory
+* The commands are executed in the project root directory.
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - commands:
+      - doSomething -a <<input_A>> -b <<input_B>>
+
+variables:
+  input_set_idx:
+    file_regex:
+      pattern: 'infile_(\d+)\..*'
+  input_A:
+    file_regex:
+      pattern: '(\w+_<<input_set_idx>>\.extA)$'
+  input_B:
+    file_regex:
+      pattern: '(\w+_<<input_set_idx>>\.extB)$'
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+infile_1.extA
+infile_1.extB
+infile_2.extA
+infile_2.extB
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+infile_1.extA
+infile_1.extB
+infile_2.extA
+infile_2.extB
+outfile_1
+outfile_2
+stdout
+stderr
+```
+
+
+
+
+
+#### x. Root directory; multiple variables values
+
+<u>Notes</u>
+
+* The`doSomething` command is run with two input files. An output file `outfile` is generated.
+* The `splitSomething` command is then run on `outfile` to process/split up the output information into multiple files, `outfile_1`, ...,  `outfile_n`.
+* A variable is defined named `outfile_i`, which has two possible values, known at submission time: `outfile_2` and `outfile_4`. These represent a subset of the file names generated by `splitSomething`. The command `processSomething` is then run on these three files to modify them in some way.
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - commands:
+      - doSomething -a input_A -b input_B
+  - commands:
+      - splitSomething outfile
+  - commands:      
+      - processSomething <<outfile_i>>
+
+variables:
+  outfile_i:
+    data: [2, 4]
+    value: 'outfile_{:d}'
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+infile_A
+infile_B
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+infile_A
+infile_B
+outfile			# -- generated by doSomething --
+outfile_1		# **  						  **
+outfile_2		# ** generated by splitSomething **	== modified by processSomething ==
+outfile_3		# **						  **
+outfile_4		# **						  **	== modified by processSomething ==
+stdout
+stderr
+```
+
+
+
+#### x. Multiple directories
+
+<u>Notes</u>
+
+* This is the same as example 3, but runs the commands in multiple sub-directories.
+* An additional variable, `sim_dir` is defined, which is assigned to the `directory` key, which in turn determines the working directory of all of the command groups. The values of this variable are found using a regular expression pattern that matches directories (within the project root) such as `sims/0` and `sims/37`. The advantage of this approach is multiple directories can be processed without modifying the `hpcflow` profile (i.e. the workflow specification is independent of the number of directories/simulations).
+
+<u>Profile</u>
+
+```yaml
+directory: <<sim_dir>>
+
+command_groups:
+  - commands:
+      - doSomething -a input_A -b input_B
+  - commands:
+      - splitSomething outfile
+  - commands:      
+      - processSomething <<outfile_i>>
+    nesting: nest
+
+variables:
+  sim_dir:
+    file_regex:
+      pattern: '(sims/[0-9]+$)'
+      is_dir: true
+  outfile_i:
+    data: [2, 4]
+    value: 'outfile_{:d}'
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+sims/
+  0/
+    infile_A
+    infile_B
+  1/
+    infile_A
+    infile_B
+  .
+  .
+  n/
+    infile_A
+    infile_B 
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+sims/
+  0/
+    infile_A
+    infile_B
+    outfile
+    outfile_1
+    outfile_2
+    outfile_3
+    outfile_4    
+  1/
+    infile_A
+    infile_B
+    outfile
+    outfile_1
+    outfile_2
+    outfile_3
+    outfile_4
+  .
+  .
+  n/
+    infile_A
+    infile_B
+    outfile
+    outfile_1
+    outfile_2
+    outfile_3
+    outfile_4    
+stdout
+stderr
+```
+
+
+
+#### x. Each command group in it's own directory
+
+<u>Notes</u>
+
+* (This task assumes the output file from `task_1` magically appears in the `task_2` directory)
+
+<u>Profile</u>
+
+```yaml
+command_groups:
+  - directory: <<task_1_dirs>>
+    commands:
+      - doSomething -a input_A -b input_B
+  - directory: <<task_2_dirs>>
+  	variable_nesting:
+      directory: 0
+      outfile_i: 1
+    commands:
+      - processSomething <<outfile_i>>
+
+variables:
+  task_1_dirs:
+    file_regex:
+      pattern: '(task_1/[0-9]+$)'
+      is_dir: true
+  task_2_dirs:
+    file_regex:
+      pattern: '(task_2/[0-9]+$)'
+      is_dir: true      
+  outfile_i:
+    data: [2, 4]
+    value: 'outfile_{:d}'
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+task_1/
+  0/
+    infile_A
+    infile_B
+  1/
+    infile_A
+    infile_B    
+task_2/
+  0/
+    outfile_1
+    outfile_2
+    outfile_3
+    outfile_4
+  1/
+    outfile_1
+    outfile_2
+    outfile_3
+    outfile_4
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+task_1/
+  0/
+    infile_A
+    infile_B
+  1/
+    infile_A
+    infile_B    
+task_2/
+  0/
+    outfile_1
+    outfile_2  < modified
+    outfile_3
+    outfile_4  < modified
+  1/
+    outfile_1
+    outfile_2  < modified
+    outfile_3
+    outfile_4  < modified
+```
+
+
+
+#### X. [low priority] Nested directories
+
+<u>Notes</u>
+
+* This pattern can be used to run the same set of commands in a set of arbitrarily nested directories that represent some parameter space.
+
+<u>Profile</u>
+
+```yaml
+directory: <<parameter_C_dir>>
+
+command_groups:
+  - commands:
+      - doSomething -a input_A -b input_B
+      
+variables:
+  parameter_A_dir:
+    file_regex:
+      pattern: '(parameter_A[0-9]+$)'
+      is_dir: true
+  parameter_B_dir:
+    file_regex:
+      pattern: '(<<parameter_A_dir>>/parameter_B[0-9]+$)'
+      is_dir: true
+  parameter_C_dir:
+    file_regex:
+      pattern: '(<<parameters_B_dir>>/parameter_C[0-9]+$)'
+      is_dir: true
+```
+
+<u>Directory structure --- initial</u>
+
+```
+profile.yml
+parameter_A1/
+  parameter_B1/
+    parameter_C1/
+      infile_A
+      infile_B
+    parameter_C2/
+      infile_A
+      infile_B  
+  parameter_B2/
+    parameter_C1/
+      infile_A
+      infile_B  
+    parameter_C2/
+      infile_A
+      infile_B 
+parameter_A2/
+  ..
+  ..
+```
+
+<u>Directory structure --- final</u>
+
+```
+profile.yml
+parameter_A1/
+  parameter_B1/
+    parameter_C1/
+      infile_A
+      infile_B
+      outfile
+      stdout
+      stderr
+    parameter_C2/
+      infile_A
+      infile_B
+      outfile
+      stdout
+      stderr    
+  parameter_B2/
+    parameter_C1/
+      infile_A
+      infile_B
+      outfile
+      stdout
+      stderr    
+    parameter_C2/
+      infile_A
+      infile_B
+      outfile
+      stdout
+      stderr    
+parameter_A2/
+  ..
+  ..
+```
+
+
+
+
+
+#### X. Template
+
+<u>Notes</u>
+
+* A
+
+<u>Profile</u>
+
+```yaml
+
+```
+
+<u>Directory structure --- initial</u>
+
+```
+
+```
+
+<u>Directory structure --- final</u>
+
+```
+
+```
+
+
+
+#### Command groups
+
+* Commands to be executed are organised into command groups (called "tasks" in `matflow` --- should we align terminology?).
+* Each command group can have its own working directory.
+* Variables that are included in the commands of a command group
+
+
+
+Types of variables:
+
+* File variables:
+  * Values are always resolved within the command group working directory
+* Data variables
+  * Values are known at submission-time [??].
+  * Values can be optionally "matched" with values of command group directory (i.e. each value of a data variable is associated with a given command group directory value).
+
+
+
+#### User defined variables
+
+<u>Variable definition</u>
+
+```python
+"""
+name : str
+data : list, optional
+file_regex : dict, optional
+	pattern : str
+	group : int
+	subset : list of int [??]
+	expected_multiplicity
+file_contents
+    path: str
+    expected_multiplicity
+value : str, optional
+
+"""
+```
+
+Data variables can 
+
+
+
+#### Categories of variables
+
+There are three categories of variables that can be defined.
+
+1. Directory variables
+   * These must be specified as a `file_regex` type (with `directory: True`)
+   * These define directories, relative to the project root directory, within which other variables may be resolved (i.e. anchored variables, below)
+2. Anchored variables
+   * These are variables that are *anchored* to a given directory, meaning their values will be resolved within a given directory.
+3. Non-anchored variables
+
