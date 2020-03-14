@@ -702,6 +702,7 @@ class CommandGroup(Base):
             i.name: {
                 'data': i.data,
                 'file_regex': i.file_regex,
+                'file_contents': i.file_contents,
                 'value': i.value,
             }
             for i in self.workflow.variable_definitions
@@ -752,6 +753,7 @@ class VarDefinition(Base):
     name = Column(String(255))
     data = Column(JSON, nullable=True)
     file_regex = Column(JSON, nullable=True)
+    file_contents = Column(JSON, nullable=True)
     value = Column(String(255), nullable=True)
 
     workflow = relationship('Workflow', back_populates='variable_definitions')
@@ -776,11 +778,12 @@ class VarDefinition(Base):
         )
         return out
 
-    def __init__(self, name, data=None, file_regex=None, value=None):
+    def __init__(self, name, data=None, file_regex=None, value=None, file_contents=None):
 
         self.name = name
         self.data = data
         self.file_regex = file_regex
+        self.file_contents = file_contents
         self.value = value
 
     def is_base_variable(self):
@@ -813,28 +816,28 @@ class VarDefinition(Base):
 
         print('VarDefinition.get_multiplicity: var_values: {}'.format(var_values), flush=True)
 
-        # if var_values:
-        #     var_length = len(var_values)
-
-        # else:
-        var_length = None
-
-        if self.data:
-            var_length = len(self.data)
-
-        elif self.file_regex:
-
-            if 'subset' in self.file_regex:
-                var_length = len(self.file_regex['subset'])
-
-            elif 'expected_multiplicity' in self.file_regex:
-                var_length = self.file_regex['expected_multiplicity']
-
-        elif self.is_base_variable():
-            var_length = 1
+        if var_values:
+            var_length = len(var_values)
 
         else:
-            raise ValueError('bad 3!')
+            var_length = None
+
+            if self.data:
+                var_length = len(self.data)
+
+            elif self.file_regex:
+
+                if 'subset' in self.file_regex:
+                    var_length = len(self.file_regex['subset'])
+
+                elif 'expected_multiplicity' in self.file_regex:
+                    var_length = self.file_regex['expected_multiplicity']
+
+            elif self.is_base_variable():
+                var_length = 1
+
+            else:
+                raise ValueError('bad 3!')
 
         return var_length
 
@@ -882,6 +885,15 @@ class VarDefinition(Base):
                             match = match_groups[self.file_regex['group']]
                             val_fmt = self.value.format(match)
                             vals.append(val_fmt)
+
+        elif self.file_contents:
+
+            path = Path(directory).joinpath(self.file_contents['path'])
+            with path.open('r') as handle:
+                for i in handle.readlines():
+                    vals.append(i.strip())
+
+            print('VarDefinition: get_values: file_contents: vals: {}'.format(vals))
 
         elif self.data:
             for i in self.data:
