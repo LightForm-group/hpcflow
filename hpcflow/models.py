@@ -812,34 +812,52 @@ class VarDefinition(Base):
         print('VarDefinition.get_multiplicity: self: {}'.format(self), flush=True)
 
         # First check if the variable is resolved.
-        var_values = [i for i in self.variable_values if i.submission == submission]
+
+        var_values = {}
+        for i in self.variable_values:
+            if i.submission == submission:
+                if i.directory_value.value not in var_values:
+                    var_values.update({i.directory_value.value: []})
+                var_values[i.directory_value.value].append(i)
+
+        # var_values = [i for i in self.variable_values if i.submission == submission]
 
         print('VarDefinition.get_multiplicity: var_values: {}'.format(var_values), flush=True)
 
-        if var_values:
-            var_length = len(var_values)
+        var_lengths = {}
+        for directory_path, var_vals in var_values.items():
 
-        else:
-            var_length = None
-
-            if self.data:
-                var_length = len(self.data)
-
-            elif self.file_regex:
-
-                if 'subset' in self.file_regex:
-                    var_length = len(self.file_regex['subset'])
-
-                elif 'expected_multiplicity' in self.file_regex:
-                    var_length = self.file_regex['expected_multiplicity']
-
-            elif self.is_base_variable():
-                var_length = 1
+            if var_vals:
+                var_length = len(var_vals)
 
             else:
-                raise ValueError('bad 3!')
+                var_length = None
 
-        return var_length
+                if self.data:
+                    var_length = len(self.data)
+
+                elif self.file_regex:
+
+                    if 'subset' in self.file_regex:
+                        var_length = len(self.file_regex['subset'])
+
+                    elif 'expected_multiplicity' in self.file_regex:
+                        var_length = self.file_regex['expected_multiplicity']
+
+                elif self.file_contents:
+
+                    if 'expected_multiplicity' in self.file_contents:
+                        var_length = self.file_contents['expected_multiplicity']
+
+                elif self.is_base_variable():
+                    var_length = 1
+
+                else:
+                    raise ValueError('bad 3!')
+
+            var_lengths.update({directory_path: var_length})
+
+        return var_lengths
 
     def get_values(self, directory):
         """Get the values of this variable.
@@ -957,17 +975,26 @@ class Submission(Base):
             self._make_alternate_scratch_dirs()
 
         # `Task`s must be generated after `SchedulerGroup`s:
+        cg_sub_iters = []
         for cg_sub in self.command_group_submissions:
+            print('\nSubmission.__init__: cg_sub: {}'.format(cg_sub))
             for iteration in self.workflow.iterations:
+                print('Submission.__init__: iteration: {}'.format(iteration))
 
                 if iteration.order_id > 0 and self.workflow.loop.get('groups'):
                     # For > first iteration, not all command groups need be run:
                     if cg_sub.command_group_exec_order not in self.workflow.loop['groups']:
                         continue
 
-                CommandGroupSubmissionIteration(iteration, cg_sub)
-                for task_num in range(cg_sub.num_outputs):
-                    Task(cg_sub, task_num, iteration)
+                cg_sub_iter = CommandGroupSubmissionIteration(iteration, cg_sub)
+                cg_sub_iters.append(cg_sub_iter)
+
+        # `cg_sub_iter.num_outputs` requires all cg_sub_iters to be generated:
+        for cg_sub_iter in cg_sub_iters:
+            print('Submission.__init__: cg_sub_iter: {}'.format(cg_sub_iter))
+            for task_num in range(cg_sub_iter.num_outputs):
+                print('Submission.__init__: task_num: {}'.format(task_num))
+                Task(cg_sub_iter, task_num)
 
         self.first_iteration.status = IterationStatus('active')
 
@@ -1005,7 +1032,8 @@ class Submission(Base):
     def get_working_directories(self, iteration):
         dirs = []
         for cg_sub in self.command_group_submissions:
-            for i in cg_sub.get_directories(iteration):
+            cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+            for i in cg_sub_iter.get_directories():
                 if i not in dirs:
                     dirs.append(i)
         return dirs
@@ -1214,6 +1242,9 @@ class Submission(Base):
 
             for idx, i in enumerate(self.scheduler_groups):
 
+                max_num_tasks = i.get_max_num_tasks(iteration)
+                step_size = i.get_step_size(iteration)
+
                 # Make the scheduler group directory for each scheduler group:
                 sg_path = iter_path.joinpath('scheduler_group_{}'.format(idx))
                 sg_path.mkdir()
@@ -1221,12 +1252,14 @@ class Submission(Base):
                 # Loop through cmd groups in this scheduler group:
                 for cg_sub_idx, cg_sub in enumerate(i.command_group_submissions):
 
-                    num_dir_vals = cg_sub.num_directories
-                    all_dir_slots = [''] * i.max_num_tasks
+                    cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+
+                    num_dir_vals = cg_sub_iter.num_directories
+                    all_dir_slots = [''] * max_num_tasks
 
                     # Distribute dirs over num_dir_slots:
-                    for k in range(0, i.max_num_tasks, i.step_size[cg_sub_idx]):
-                        dir_idx = floor((k / i.max_num_tasks) * num_dir_vals)
+                    for k in range(0, max_num_tasks, step_size[cg_sub_idx]):
+                        dir_idx = floor((k / max_num_tasks) * num_dir_vals)
                         all_dir_slots[k] = 'REPLACE_WITH_DIR_{}'.format(dir_idx)
 
                     wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(
@@ -1240,8 +1273,8 @@ class Submission(Base):
                 # Make the variable values directories for each scheduler group:
                 var_values_path = sg_path.joinpath('var_values')
                 var_values_path.mkdir()
-                for j in range(1, i.max_num_tasks + 1):
-                    j_fmt = zeropad(j, i.max_num_tasks + 1)
+                for j in range(1, max_num_tasks + 1):
+                    j_fmt = zeropad(j, max_num_tasks + 1)
                     vv_j_path = var_values_path.joinpath(j_fmt)
                     vv_j_path.mkdir()
 
@@ -1312,6 +1345,7 @@ class Submission(Base):
         qsub_out = proc.stdout.decode().strip()
         qsub_err = proc.stderr.decode().strip()
         print(qsub_out, flush=True)
+        print(qsub_err, flush=True)
 
         # Extract newly submitted job ID:
         pattern = r'[0-9]+'
@@ -1347,7 +1381,7 @@ class CommandGroupSubmission(Base):
     task_stop = Column(Integer)
     task_step = Column(Integer)
     commands_written = Column(Boolean)
-    _task_multiplicity = Column('task_multiplicity', Integer, nullable=True)
+    # _task_multiplicity = Column('task_multiplicity', Integer, nullable=True)
 
     command_group = relationship('CommandGroup',
                                  back_populates='command_group_submissions')
@@ -1363,8 +1397,6 @@ class CommandGroupSubmission(Base):
         uselist=False,
         cascade='all, delete, delete-orphan'
     )
-
-    tasks = relationship('Task', back_populates='command_group_submission')
 
     command_group_submission_iterations = relationship(
         'CommandGroupSubmissionIteration',
@@ -1388,7 +1420,6 @@ class CommandGroupSubmission(Base):
 
         self.command_group = command_group
         self.submission = submission
-        self._task_multiplicity = self._get_task_multiplicity()
         self.task_range = task_range
 
     @property
@@ -1407,10 +1438,6 @@ class CommandGroupSubmission(Base):
     @property
     def task_range_idx(self):
         return list(range(*self.task_range))
-
-    @property
-    def task_multiplicity(self):
-        return self._task_multiplicity
 
     @property
     def variable_values(self):
@@ -1440,32 +1467,6 @@ class CommandGroupSubmission(Base):
 
         return num
 
-    def get_directory_values(self, iteration):
-
-        dir_vals = [i.value for i in self.get_directories(iteration)]
-        return dir_vals
-
-    def get_directories(self, iteration):
-        """Get the directory variable values associated with this command group
-        submission and iteration."""
-
-        dir_vars_all = self.command_group.directory_variable.variable_values
-        # Get only those with correct submission and iteration
-
-        dirs = []
-        for i in dir_vars_all:
-            if i.iteration == iteration:
-                if i.submission == self.submission:
-                    dirs.append(i)
-
-        # dirs = [i for idx, i in enumerate(dirs) if idx in self.task_range_idx]
-
-        return dirs
-
-    @property
-    def num_directories(self):
-        return len(self.get_directories(iteration=self.submission.first_iteration))
-
     @property
     def scheduler_group_index(self):
         """Get the position of this command group submission within the submission's
@@ -1484,20 +1485,6 @@ class CommandGroupSubmission(Base):
     def scheduler_group(self):
         'Get the scheduler group to which this command group belongs.'
         return self.submission.get_scheduler_group(self)
-
-    @property
-    def num_outputs(self):
-        'Get the number of outputs for this command group submission.'
-        return self.scheduler_group.num_outputs[self.scheduler_group_index[1]]
-
-    @property
-    def step_size(self):
-        'Get the scheduler step size for this command group submission.'
-        return self.scheduler_group.step_size[self.scheduler_group_index[1]]
-
-    @property
-    def num_tasks(self):
-        return len(self.tasks)
 
     def get_command_group_submission_iteration(self, iteration):
         for i in iteration.command_group_submission_iterations:
@@ -1519,47 +1506,24 @@ class CommandGroupSubmission(Base):
             if i.name == var_name:
                 return i
 
-    def _get_task_multiplicity(self):
-        """Get the number of tasks associated with this command group
-        submission."""
-
-        task_multi_all = {}
-        for i in self.command_group.variable_definitions:
-            var_length = i.get_multiplicity(self.submission)
-            task_multi_all.update({i.name: var_length})
-
-        print('CGS._get_task_multiplicity.task_multi_all: {}'.format(
-            task_multi_all), flush=True)
-
-        if task_multi_all:
-            uniq_lens = set(task_multi_all.values())
-            num_uniq_lens = len(uniq_lens)
-            if num_uniq_lens == 1:
-                task_multi = min(uniq_lens)
-            elif num_uniq_lens == 2:
-                if min(uniq_lens) != 1:
-                    raise ValueError('bad 4!')
-                task_multi = max(uniq_lens)
-            else:
-                raise ValueError('bad 5!')
-        else:
-            task_multi = 1
-
-        print('CGS._get_task_multiplicity.task_multi: {}'.format(task_multi), flush=True)
-
-        return task_multi
-
     def write_jobscript(self, dir_path):
         """Write the jobscript."""
 
+        # TOOD: should be in CGSI; I don't think so because need to have same jobscript for
+        # each iteration?
+
         print('self.command_group.scheduler: {}'.format(self.command_group.scheduler))
+
+        cg_sub_first_iter = self.get_command_group_submission_iteration(
+            self.submission.first_iteration)
 
         js_path = self.command_group.scheduler.write_jobscript(
             dir_path=dir_path,
             workflow_directory=self.submission.workflow.directory,
             command_group_order=self.command_group_exec_order,
-            max_num_tasks=self.scheduler_group.max_num_tasks,
-            task_step_size=self.step_size,
+            max_num_tasks=self.scheduler_group.get_max_num_tasks(
+                self.submission.first_iteration),
+            task_step_size=cg_sub_first_iter.step_size,
             modules=self.command_group.modules,
             sources=self.command_group.sources,
             archive=self.command_group.archive is not None,
@@ -1570,8 +1534,9 @@ class CommandGroupSubmission(Base):
             dir_path=dir_path,
             workflow_directory=self.submission.workflow.directory,
             command_group_order=self.command_group_exec_order,
-            max_num_tasks=self.scheduler_group.max_num_tasks,
-            task_step_size=self.step_size,
+            max_num_tasks=self.scheduler_group.get_max_num_tasks(
+                self.submission.first_iteration),
+            task_step_size=cg_sub_first_iter.step_size,
             command_group_submission_id=self.id_,
         )
 
@@ -1652,7 +1617,7 @@ class CommandGroupSubmission(Base):
                         # These need to happen once *per iteration* per CGS:
 
                         print(write_dirs_msg.format(datetime.now()), flush=True)
-                        self.write_working_directories(project, iteration)
+                        cg_sub_iter.write_working_directories(project)
 
                         if self.command_group.alternate_scratch:
                             print(make_alt_msg.format(datetime.now()), flush=True)
@@ -1680,13 +1645,16 @@ class CommandGroupSubmission(Base):
         print('CGS.write_variable_files: var_vals_normed: {}'.format(
             var_vals_normed), flush=True)
 
+        max_num_tasks = self.scheduler_group.get_max_num_tasks(
+            self.submission.first_iteration)
+
         var_values_task_dir = project.hf_dir.joinpath(
             'workflow_{}'.format(self.submission.workflow.id_),
             'submit_{}'.format(self.submission.order_id),
             'iter_{}'.format(iteration.order_id),
             'scheduler_group_{}'.format(self.scheduler_group_index[0]),
             'var_values',
-            zeropad(task.scheduler_id, self.scheduler_group.max_num_tasks),
+            zeropad(task.scheduler_id, max_num_tasks),
         )
 
         for var_name, var_val_all in var_vals_normed.items():
@@ -1726,8 +1694,11 @@ class CommandGroupSubmission(Base):
         about_msg = ['# --- commands file generated by `hpcflow` (version: {}) '
                      'on {} ---'.format(__version__, dt_stamp)]
 
+        max_num_tasks = self.scheduler_group.get_max_num_tasks(
+            self.submission.first_iteration)
+
         lns_task_id_pad = [
-            'MAX_NUM_TASKS={}'.format(self.scheduler_group.max_num_tasks),
+            'MAX_NUM_TASKS={}'.format(max_num_tasks),
             'MAX_NUM_DIGITS="${#MAX_NUM_TASKS}"',
             'ZEROPAD_TASK_ID=$(printf "%0${MAX_NUM_DIGITS}d" $SGE_TASK_ID)',
         ]
@@ -1778,33 +1749,6 @@ class CommandGroupSubmission(Base):
         )
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
-
-    def write_working_directories(self, project, iteration):
-        'Replace lines in the working_dirs files with actual directory paths.'
-
-        dir_vals = self.get_directories(iteration)
-
-        wk_dirs_path = project.hf_dir.joinpath(
-            'workflow_{}'.format(self.submission.workflow.id_),
-            'submit_{}'.format(self.submission.order_id),
-            'iter_{}'.format(iteration.order_id),
-            'working_dirs_{}{}'.format(
-                self.command_group_exec_order, CONFIG['working_dirs_file_ext']),
-        )
-
-        with wk_dirs_path.open() as handle:
-            file_lns = handle.readlines()
-
-        for idx, i in enumerate(file_lns):
-            new_val = i.strip()
-            if 'REPLACE_WITH_DIR_' in i:
-                dir_idx = int(i.split('REPLACE_WITH_DIR_')[1])
-                new_val = dir_vals[dir_idx].value
-            file_lns[idx] = new_val
-
-        with wk_dirs_path.open('w') as handle:
-            for i in file_lns:
-                handle.write(i + '\n')
 
     def write_alt_scratch_exclusion_list(self, project, task, iteration):
         'Write alternate scratch exclusion files (for e.g. rsync)'
@@ -1875,7 +1819,8 @@ class CommandGroupSubmission(Base):
                 return i
 
     def get_task(self, task_idx, iteration):
-        for i in self.tasks:
+        cg_sub_iter = self.get_command_group_submission_iteration(iteration)
+        for i in cg_sub_iter.tasks:
             if i.order_id == task_idx and i.iteration == iteration:
                 return i
 
@@ -2026,41 +1971,38 @@ class Task(Base):
     _archive_end_time = Column('archive_end_time', DateTime, nullable=True)
     archived_task_id = Column(Integer, ForeignKey('task.id'), nullable=True)
 
-    command_group_submission_id = Column(
-        Integer, ForeignKey('command_group_submission.id'))
+    command_group_submission_iteration_id = Column(
+        Integer, ForeignKey('command_group_submission_iteration.id'))
 
-    iteration_id = Column(Integer, ForeignKey('iteration.id'))
-
-    command_group_submission = relationship(
-        'CommandGroupSubmission', back_populates='tasks', uselist=False)
+    command_group_submission_iteration = relationship(
+        'CommandGroupSubmissionIteration', back_populates='tasks', uselist=False)
 
     archived_task = relationship('Task', uselist=False, remote_side=id_)
 
-    iteration = relationship('Iteration', uselist=False)
-
-    def __init__(self, command_group_submission, order_id, iteration):
+    def __init__(self, command_group_submission_iteration, order_id):
         self.order_id = order_id
-        self.iteration = iteration
-        self.command_group_submission = command_group_submission
+        self.command_group_submission_iteration = command_group_submission_iteration
         self.start_time = None
         self.end_time = None
 
-        if self.command_group_submission.command_group.archive:
+        if self.command_group_submission_iteration.command_group_submission.command_group.archive:
             self.archive_status = TaskArchiveStatus('pending')
+
+    @property
+    def iteration(self):
+        return self.command_group_submission_iteration.iteration
 
     def __repr__(self):
         out = (
             '{}('
             'order_id={}, '
-            'iteration={}, '
-            'command_group_submission_id={}, '
+            'command_group_submission_iteration_id={}, '
             'start_time={}, '
             'end_time={}'
             ')').format(
                 self.__class__.__name__,
                 self.order_id,
-                self.iteration,
-                self.command_group_submission_id,
+                self.command_group_submission_iteration_id,
                 self.start_time,
                 self.end_time,
         )
@@ -2076,8 +2018,8 @@ class Task(Base):
     @property
     def scheduler_id(self):
         'Get the task ID, as understood by the scheduler.'
-        num_tasks = self.command_group_submission.num_outputs
-        step_size = self.command_group_submission.step_size
+        num_tasks = self.command_group_submission_iteration.num_outputs
+        step_size = self.command_group_submission_iteration.step_size
         scheduler_range = range(1, 1 + (num_tasks * step_size), step_size)
         scheduler_id = scheduler_range[self.order_id]
 
@@ -2116,8 +2058,9 @@ class Task(Base):
 
     def get_working_directory(self):
         'Get the "working directory" of this task.'
-        dir_vals = self.command_group_submission.get_directories(self.iteration)
-        dirs_per_task = len(dir_vals) / self.command_group_submission.num_outputs
+        dir_vals = self.command_group_submission_iteration.get_directories()
+        dirs_per_task = len(dir_vals) / \
+            self.command_group_submission_iteration.num_outputs
         dir_idx = floor(self.order_id * dirs_per_task)
         working_dir = dir_vals[dir_idx]
 
@@ -2223,8 +2166,9 @@ class Task(Base):
         """
 
         task_directory = self.get_working_directory()
-        sub_var_vals = self.command_group_submission.submission.variable_values
-        cmd_group_var_names = self.command_group_submission.command_group.variable_names
+        cg_sub = self.command_group_submission_iteration.command_group_submission
+        sub_var_vals = cg_sub.submission.variable_values
+        cmd_group_var_names = cg_sub.command_group.variable_names
         var_vals = {}
 
         print('Task.get_variable_values: sub_var_vals:', flush=True)
@@ -2264,7 +2208,8 @@ class Task(Base):
         only_names, only_vals = zip(*var_vals.items())
         only_vals_uniform = coerce_same_length(list(only_vals))
 
-        if self.command_group_submission.command_group.is_job_array:
+        cg_sub = self.command_group_submission_iteration.command_group_submission
+        if cg_sub.command_group.is_job_array:
             val_idx = self.order_id % len(only_vals_uniform[0])
             only_vals_uniform = [[i[val_idx]] for i in only_vals_uniform]
 
@@ -2326,6 +2271,7 @@ class CommandGroupSubmissionIteration(Base):
         'CommandGroupSubmission',
         back_populates='command_group_submission_iterations',
     )
+    tasks = relationship('Task', back_populates='command_group_submission_iteration')
 
     def __init__(self, iteration, command_group_submission):
         self.iteration = iteration
@@ -2346,6 +2292,124 @@ class CommandGroupSubmissionIteration(Base):
         )
         return out
 
+    def get_directory_values(self):
+
+        dir_vals = [i.value for i in self.get_directories()]
+        return dir_vals
+
+    def get_directories(self):
+        """Get the directory variable values associated with this command group
+        submission and iteration."""
+
+        dir_vars_all = self.command_group_submission.command_group.directory_variable.variable_values
+        # Get only those with correct submission and iteration
+
+        dirs = []
+        for i in dir_vars_all:
+            if i.iteration == self.iteration:
+                if i.submission == self.command_group_submission.submission:
+                    dirs.append(i)
+
+        # dirs = [i for idx, i in enumerate(dirs) if idx in self.task_range_idx]
+
+        return dirs
+
+    @property
+    def num_directories(self):
+        return len(self.get_directories())
+
+    def get_task_multiplicity(self):
+        """Get the number of tasks associated with this command group submission."""
+
+        # TODO: move get_task_multiplicity to CommandGroupSubmissionIteration !
+
+        dirs = self.get_directory_values()
+        print('CGSI.get_task_multiplicity: dirs: {}'.format(dirs))
+
+        sub = self.command_group_submission.submission
+
+        var_lengths = {}
+        for directory in dirs:
+            var_lengths.update({directory: {}})
+            for i in self.command_group_submission.command_group.variable_definitions:
+                var_lengths_i = i.get_multiplicity(sub)  # as a func of dir
+                for var_dir, num in var_lengths_i.items():
+                    if var_dir == directory:
+                        var_lengths[directory].update({i.name: num})
+
+        print('CGSI._get_task_multiplicity.var_lengths: {}'.format(var_lengths), flush=True)
+
+        var_lengths_combined = {}
+        for directory, var_nums in var_lengths.items():
+            if var_nums:
+                uniq_lens = set(var_nums.values())
+                num_uniq_lens = len(uniq_lens)
+                if num_uniq_lens == 1:
+                    combined_len = min(uniq_lens)
+                elif num_uniq_lens == 2:
+                    if min(uniq_lens) != 1:
+                        raise ValueError('bad 4!')
+                    combined_len = max(uniq_lens)
+                else:
+                    raise ValueError('bad 5!')
+            else:
+                combined_len = 1
+
+            print('CGSI._get_task_multiplicity.combined_len: {}'.format(
+                combined_len), flush=True)
+
+            var_lengths_combined.update({directory: combined_len})
+
+        print('CGSI._get_task_multiplicity.var_lengths_combined: {}'.format(
+            var_lengths_combined), flush=True)
+
+        return var_lengths_combined
+
+    @property
+    def num_outputs(self):
+        'Get the number of outputs for this command group submission.'
+        return self.command_group_submission.scheduler_group.get_num_outputs(self.iteration)[
+            self.command_group_submission.scheduler_group_index[1]]
+
+    @property
+    def step_size(self):
+        'Get the scheduler step size for this command group submission.'
+        return self.command_group_submission.scheduler_group.get_step_size(self.iteration)[
+            self.command_group_submission.scheduler_group_index[1]]
+
+    @property
+    def num_tasks(self):
+        return len(self.tasks)
+
+    def write_working_directories(self, project):
+        'Replace lines in the working_dirs files with actual directory paths.'
+
+        dir_vals = self.get_directories()
+
+        cg_sub = self.command_group_submission
+
+        wk_dirs_path = project.hf_dir.joinpath(
+            'workflow_{}'.format(cg_sub.submission.workflow.id_),
+            'submit_{}'.format(cg_sub.submission.order_id),
+            'iter_{}'.format(self.iteration.order_id),
+            'working_dirs_{}{}'.format(
+                cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']),
+        )
+
+        with wk_dirs_path.open() as handle:
+            file_lns = handle.readlines()
+
+        for idx, i in enumerate(file_lns):
+            new_val = i.strip()
+            if 'REPLACE_WITH_DIR_' in i:
+                dir_idx = int(i.split('REPLACE_WITH_DIR_')[1])
+                new_val = dir_vals[dir_idx].value
+            file_lns[idx] = new_val
+
+        with wk_dirs_path.open('w') as handle:
+            for i in file_lns:
+                handle.write(i + '\n')
+
 
 class SchedulerGroup(object):
     """Class to represent a collection of consecutive command group submissions that have
@@ -2355,38 +2419,26 @@ class SchedulerGroup(object):
 
         self.order_id = order_id
         self.command_group_submissions = command_groups_submissions
-        self._num_outputs = self._get_num_outputs()
 
     def __repr__(self):
         out = ('{}('
                'order_id={}, '
                'command_group_submissions={}, '
-               'num_outputs={}, '
-               'max_num_tasks={}, '
-               'step_size={}'
                ')').format(
             self.__class__.__name__,
             self.order_id,
             self.command_group_submissions,
-            self.num_outputs,
-            self.max_num_tasks,
-            self.step_size,
         )
         return out
 
-    @property
-    def num_outputs(self):
-        return self._num_outputs
+    def get_max_num_tasks(self, iteration):
+        return max(self.get_num_outputs(iteration))
 
-    @property
-    def max_num_tasks(self):
-        return max(self.num_outputs)
+    def get_step_size(self, iteration):
+        return [int(self.get_max_num_tasks(iteration) / i)
+                for i in self.get_num_outputs(iteration)]
 
-    @property
-    def step_size(self):
-        return [int(self.max_num_tasks / i) for i in self.num_outputs]
-
-    def _get_num_outputs(self):
+    def get_num_outputs(self, iteration):
 
         num_outs = 1
         num_outs_prev = num_outs
@@ -2395,15 +2447,26 @@ class SchedulerGroup(object):
         # Get num_outputs for all previous cg subs in this scheduler group
         for idx, cg_sub in enumerate(self.command_group_submissions):
 
-            print('SchedulerGroup._get_num_outputs: cg_sub idx: {}'.format(idx), flush=True)
+            print('SchedulerGroup.get_num_outputs: cg_sub idx: {}'.format(idx), flush=True)
+
+            print('SchedulerGroup.get_num_outputs: cg_sub_iters: ')
+            pprint(cg_sub.command_group_submission_iterations)
+
+            cg_sub_iter = None
+            for i in cg_sub.command_group_submission_iterations:
+                if i.iteration == iteration:
+                    cg_sub_iter = i
+                    break
+            if not cg_sub_iter:
+                raise ValueError('Could not find CommandGroupSubmissionIteration object.')
 
             # Number of outputs depend on task multiplicity, `is_job_array` and `nesting`
             is_job_array = cg_sub.command_group.is_job_array
             nesting = cg_sub.command_group.nesting
 
-            print('SchedulerGroup._get_num_outputs: is_job_array: {}'.format(
+            print('SchedulerGroup.get_num_outputs: is_job_array: {}'.format(
                 is_job_array), flush=True)
-            print('SchedulerGroup._get_num_outputs: nesting: {}'.format(nesting), flush=True)
+            print('SchedulerGroup.get_num_outputs: nesting: {}'.format(nesting), flush=True)
 
             if nesting == NestingType('nest'):  # or first_cmd_group:
                 num_outs = num_outs_prev
@@ -2413,15 +2476,18 @@ class SchedulerGroup(object):
                 num_outs = 1
 
             if is_job_array:
-                if nesting in [NestingType('hold'), None]:
-                    num_outs *= cg_sub.num_directories
-                    print('SchedulerGroup._get_num_outputs: cg_sub.num_directories: {}'.format(
-                        cg_sub.num_directories), flush=True)
-                num_outs *= cg_sub.task_multiplicity
-                print('SchedulerGroup._get_num_outputs: cg_sub.task_multiplicity: {}'.format(
-                    cg_sub.task_multiplicity), flush=True)
+                # if nesting in [NestingType('hold'), None]:
+                #     num_outs *= cg_sub.num_directories
+                #     print('SchedulerGroup._get_num_outputs: cg_sub.num_directories: {}'.format(
+                #         cg_sub.num_directories), flush=True)
 
-            print('SchedulerGroup._get_num_outputs: num_outs: {}'.format(num_outs), flush=True)
+                # cg_sub.task_multiplicity is a dict of directory keys
+                num_outs *= sum(cg_sub_iter.get_task_multiplicity().values())
+
+                print('SchedulerGroup.get_num_outputs: cg_sub_iter.task_multiplicity: {}'.format(
+                    cg_sub_iter.get_task_multiplicity()), flush=True)
+
+            print('SchedulerGroup.get_num_outputs: num_outs: {}'.format(num_outs), flush=True)
 
             num_outs_all.append(num_outs)
             num_outs_prev = num_outs
