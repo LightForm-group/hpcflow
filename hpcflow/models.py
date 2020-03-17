@@ -959,9 +959,14 @@ class Submission(Base):
 
         self.resolve_variable_values(self.workflow.directory, self.first_iteration)
 
+        cg_subs = []
         for i in self.workflow.command_groups:
             task_range = [1, -1, 1]  # TEMP
-            CommandGroupSubmission(i, self, task_range)
+            cg_sub = CommandGroupSubmission(i, self, task_range)
+            cg_subs.append(cg_sub)
+
+        session = Session.object_session(self)
+        session.commit()
 
         # `SchedulerGroup`s must be generated after `CommandGroupSubmission`s and
         # `resolve_variable_values`:
