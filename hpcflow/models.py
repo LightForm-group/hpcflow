@@ -809,8 +809,6 @@ class VarDefinition(Base):
 
         """
 
-        print('VarDefinition.get_multiplicity: self: {}'.format(self), flush=True)
-
         # First check if the variable is resolved.
 
         var_values = {}
@@ -819,10 +817,6 @@ class VarDefinition(Base):
                 if i.directory_value.value not in var_values:
                     var_values.update({i.directory_value.value: []})
                 var_values[i.directory_value.value].append(i)
-
-        # var_values = [i for i in self.variable_values if i.submission == submission]
-
-        print('VarDefinition.get_multiplicity: var_values: {}'.format(var_values), flush=True)
 
         var_lengths = {}
         for directory_path, var_vals in var_values.items():
@@ -911,8 +905,6 @@ class VarDefinition(Base):
                 for i in handle.readlines():
                     vals.append(i.strip())
 
-            print('VarDefinition: get_values: file_contents: vals: {}'.format(vals))
-
         elif self.data:
             for i in self.data:
                 vals.append(self.value.format(i))
@@ -972,19 +964,14 @@ class Submission(Base):
         # `resolve_variable_values`:
         self._scheduler_groups = self.get_scheduler_groups()
 
-        for i in self.command_group_submissions:
-            print('Submission.__init__: scheduler_group: {}'.format(
-                i.scheduler_group), flush=True)
-
         if self.workflow.has_alternate_scratch:
             self._make_alternate_scratch_dirs()
 
         # `Task`s must be generated after `SchedulerGroup`s:
         cg_sub_iters = []
         for cg_sub in self.command_group_submissions:
-            print('\nSubmission.__init__: cg_sub: {}'.format(cg_sub))
+
             for iteration in self.workflow.iterations:
-                print('Submission.__init__: iteration: {}'.format(iteration))
 
                 if iteration.order_id > 0 and self.workflow.loop.get('groups'):
                     # For > first iteration, not all command groups need be run:
@@ -996,9 +983,7 @@ class Submission(Base):
 
         # `cg_sub_iter.num_outputs` requires all cg_sub_iters to be generated:
         for cg_sub_iter in cg_sub_iters:
-            print('Submission.__init__: cg_sub_iter: {}'.format(cg_sub_iter))
             for task_num in range(cg_sub_iter.num_outputs):
-                print('Submission.__init__: task_num: {}'.format(task_num))
                 Task(cg_sub_iter, task_num)
 
         self.first_iteration.status = IterationStatus('active')
@@ -1110,8 +1095,6 @@ class Submission(Base):
     def resolve_variable_values(self, root_directory, iteration):
         """Attempt to resolve as many variable values in the Workflow as
         possible."""
-
-        print('Submission.resolve_variable_values: iteration: {}'.format(iteration), flush=True)
 
         session = Session.object_session(self)
 
@@ -1516,8 +1499,6 @@ class CommandGroupSubmission(Base):
 
         # TOOD: should be in CGSI; I don't think so because need to have same jobscript for
         # each iteration?
-
-        print('self.command_group.scheduler: {}'.format(self.command_group.scheduler))
 
         cg_sub_first_iter = self.get_command_group_submission_iteration(
             self.submission.first_iteration)
@@ -2329,7 +2310,6 @@ class CommandGroupSubmissionIteration(Base):
         # TODO: move get_task_multiplicity to CommandGroupSubmissionIteration !
 
         dirs = self.get_directory_values()
-        print('CGSI.get_task_multiplicity: dirs: {}'.format(dirs))
 
         sub = self.command_group_submission.submission
 
@@ -2341,8 +2321,6 @@ class CommandGroupSubmissionIteration(Base):
                 for var_dir, num in var_lengths_i.items():
                     if var_dir == directory:
                         var_lengths[directory].update({i.name: num})
-
-        print('CGSI._get_task_multiplicity.var_lengths: {}'.format(var_lengths), flush=True)
 
         var_lengths_combined = {}
         for directory, var_nums in var_lengths.items():
@@ -2360,13 +2338,7 @@ class CommandGroupSubmissionIteration(Base):
             else:
                 combined_len = 1
 
-            print('CGSI._get_task_multiplicity.combined_len: {}'.format(
-                combined_len), flush=True)
-
             var_lengths_combined.update({directory: combined_len})
-
-        print('CGSI._get_task_multiplicity.var_lengths_combined: {}'.format(
-            var_lengths_combined), flush=True)
 
         return var_lengths_combined
 
