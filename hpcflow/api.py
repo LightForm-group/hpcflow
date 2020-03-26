@@ -125,8 +125,7 @@ def submit_workflow(workflow_id, dir_path=None, task_range='all'):
     session = Session()
 
     workflow = session.query(Workflow).get(workflow_id)
-    stats = False
-    submission = workflow.add_submission(project, task_range, stats)
+    submission = workflow.add_submission(project, task_range)
 
     session.commit()
 
@@ -292,7 +291,7 @@ def get_scheduler_stats(cmd_group_sub_id, task_idx, iter_idx, dir_path=None):
     session.close()
 
 
-def get_stats(dir_path=None, workflow_id=None, jsonable=True):
+def get_stats(dir_path=None, workflow_id=None, jsonable=True, datetime_dicts=False):
     'Get task statistics (as a JSON-like dict) for a project.'
 
     project = Project(dir_path)
@@ -317,7 +316,8 @@ def get_stats(dir_path=None, workflow_id=None, jsonable=True):
         workflow_ids = all_workflow_ids
 
     workflows = [session.query(Workflow).get(i) for i in workflow_ids]
-    stats = [i.get_stats(jsonable=jsonable) for i in workflows]
+    stats = [i.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
+             for i in workflows]
 
     session.close()
 

@@ -65,6 +65,26 @@ def zeropad(num, largest):
     return padded
 
 
+def datetime_to_dict(dt):
+    return {
+        'year': dt.year,
+        'month': dt.month,
+        'day': dt.day,
+        'hour': dt.hour,
+        'minute': dt.minute,
+        'second': dt.second,
+        'microsecond': dt.microsecond,
+    }
+
+
+def timedelta_to_dict(td):
+    return {
+        'days': td.days,
+        'seconds': td.seconds,
+        'microseconds': td.microseconds,
+    }
+
+
 def format_time_delta(time_delta):
 
     days, days_rem = divmod(time_delta.total_seconds(), 3600 * 24)

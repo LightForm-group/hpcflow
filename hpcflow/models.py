@@ -23,7 +23,7 @@ from hpcflow.base_db import Base
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
 from hpcflow.scheduler import SunGridEngine, DirectExecution
-from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex
+from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex, datetime_to_dict, timedelta_to_dict
 from hpcflow.validation import validate_task_multiplicity
 from hpcflow.variables import (
     select_cmd_group_var_names, select_cmd_group_var_definitions,
@@ -284,7 +284,7 @@ class Workflow(Base):
             if i.cloud_provider != CloudProvider.null:
                 i.cloud_provider.check_access()
 
-    def add_submission(self, project, task_range=None, stats=True):
+    def add_submission(self, project, task_range=None):
         """Add a new submission to this Workflow.
 
         Parameters
@@ -361,7 +361,7 @@ class Workflow(Base):
         submission = Submission(self, task_range)  # Generate CGSs and Tasks
         submission.write_submit_dirs(project.hf_dir)
         js_paths = submission.write_jobscripts(project.hf_dir)
-        submission.submit_jobscripts(js_paths, stats)
+        submission.submit_jobscripts(js_paths)
 
         return submission
 
@@ -461,11 +461,12 @@ class Workflow(Base):
             self.root_archive.execute(self.root_archive_excludes,
                                       self.root_archive_directory)
 
-    def get_stats(self, jsonable=True):
+    def get_stats(self, jsonable=True, datetime_dicts=False):
         'Get task statistics for this workflow.'
         out = {
             'workflow_id': self.id_,
-            'submissions': [i.get_stats(jsonable=jsonable) for i in self.submissions]
+            'submissions': [i.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
+                            for i in self.submissions]
         }
         return out
 
@@ -511,6 +512,7 @@ class CommandGroup(Base):
     archive_excludes = Column(JSON, nullable=True)
     archive_directory = Column(String(255), nullable=True)
     _alternate_scratch = Column('alternate_scratch', String(255), nullable=True)
+    stats = Column(Boolean)
 
     archive = relationship('Archive', back_populates='command_groups')
     workflow = relationship('Workflow', back_populates='command_groups')
@@ -539,7 +541,8 @@ class CommandGroup(Base):
     def __init__(self, commands, directory_var, is_job_array=True,
                  exec_order=None, nesting=None, modules=None, sources=None,
                  scheduler=None, profile_name=None, profile_order=None, archive=None,
-                 archive_excludes=None, archive_directory=None, alternate_scratch=None):
+                 archive_excludes=None, archive_directory=None, alternate_scratch=None,
+                 stats=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -607,6 +610,7 @@ class CommandGroup(Base):
         self.directory_variable = directory_var
         self.profile_name = profile_name
         self.profile_order = profile_order
+        self.stats = stats
 
         self.archive = archive
         self.archive_excludes = archive_excludes
@@ -1273,13 +1277,13 @@ class Submission(Base):
         js_paths = []
         js_stats_paths = []
         for cg_sub in self.command_group_submissions:
-            js_path_i, js_stats_path_i = cg_sub.write_jobscript(dir_path=submit_path)
-            js_paths.append(js_path_i)
-            js_stats_paths.append(js_stats_path_i)
+            js_paths_i = cg_sub.write_jobscript(dir_path=submit_path)
+            js_paths.append(js_paths_i['jobscript'])
+            js_stats_paths.append(js_paths_i['stats_jobscript'])
 
         return js_paths, js_stats_paths
 
-    def submit_jobscripts(self, jobscript_paths, stats):
+    def submit_jobscripts(self, jobscript_paths):
 
         js_paths, js_stat_paths = jobscript_paths
 
@@ -1289,7 +1293,7 @@ class Submission(Base):
 
             iter_idx_var = 'ITER_IDX={}'.format(iteration.order_id)
 
-            for js_path, js_stat_path, cg_sub in zip(
+            for js_path_i, js_stat_path_i, cg_sub in zip(
                     js_paths, js_stat_paths, self.command_group_submissions):
 
                 cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
@@ -1311,20 +1315,20 @@ class Submission(Base):
                     qsub_cmd += [hold_arg, last_submit_id]
 
                 qsub_cmd += ['-v', iter_idx_var]
-                qsub_cmd.append(str(js_path))
+                qsub_cmd.append(str(js_path_i))
 
                 # Submit the jobscript:
-                job_id_str = self.submit_jobscript(qsub_cmd, js_path, iteration)
+                job_id_str = self.submit_jobscript(qsub_cmd, js_path_i, iteration)
                 cg_sub_iter.scheduler_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
                 # Submit the stats jobscript:
-                if stats:
+                if js_stat_path_i:
                     st_cmd = [sumbit_cmd, '-hold_jid_ad',
                               last_submit_id, '-v', iter_idx_var]
-                    st_cmd.append(str(js_stat_path))
+                    st_cmd.append(str(js_stat_path_i))
 
-                    job_id_str = self.submit_jobscript(st_cmd, js_stat_path, iteration)
+                    job_id_str = self.submit_jobscript(st_cmd, js_stat_path_i, iteration)
                     last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
@@ -1347,12 +1351,13 @@ class Submission(Base):
 
         return job_id_str
 
-    def get_stats(self, jsonable=True):
+    def get_stats(self, jsonable=True, datetime_dicts=False):
         'Get task statistics for this submission.'
         out = {
             'submission_id': self.id_,
-            'command_group_submissions': [i.get_stats(jsonable=jsonable)
-                                          for i in self.command_group_submissions]
+            'command_group_submissions': [
+                i.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
+                for i in self.command_group_submissions]
         }
         return out
 
@@ -1513,17 +1518,25 @@ class CommandGroupSubmission(Base):
             alternate_scratch_dir=self.alternate_scratch_dir,
             command_group_submission_id=self.id_
         )
-        js_stats_path = self.command_group.scheduler.write_stats_jobscript(
-            dir_path=dir_path,
-            workflow_directory=self.submission.workflow.directory,
-            command_group_order=self.command_group_exec_order,
-            max_num_tasks=self.scheduler_group.get_max_num_tasks(
-                self.submission.first_iteration),
-            task_step_size=cg_sub_first_iter.step_size,
-            command_group_submission_id=self.id_,
-        )
 
-        return js_path, js_stats_path
+        js_stats_path = None
+        if self.command_group.stats:
+            js_stats_path = self.command_group.scheduler.write_stats_jobscript(
+                dir_path=dir_path,
+                workflow_directory=self.submission.workflow.directory,
+                command_group_order=self.command_group_exec_order,
+                max_num_tasks=self.scheduler_group.get_max_num_tasks(
+                    self.submission.first_iteration),
+                task_step_size=cg_sub_first_iter.step_size,
+                command_group_submission_id=self.id_,
+            )
+
+        out = {
+            'jobscript': js_path,
+            'stats_jobscript': js_stats_path,
+        }
+
+        return out
 
     def write_runtime_files(self, project, task_idx, iter_idx):
         iteration = self.get_iteration(iter_idx)
@@ -1840,14 +1853,18 @@ class CommandGroupSubmission(Base):
         task = self.get_task(task_idx, iteration)
         self.command_group.archive.execute_with_lock(task)
 
-    def get_stats(self, jsonable=True):
+    def get_stats(self, jsonable=True, datetime_dicts=False):
         'Get task statistics for this command group submission.'
+        print('CGS.get_stats: self.command_group_submission_iterations: {}'.format(
+            self.command_group_submission_iterations))
         out = {
             'command_group_submission_id': self.id_,
             'command_group_id': self.command_group.id_,
             'commands': self.command_group.commands,
-            'tasks': [i.get_stats(jsonable=jsonable) for i in self.tasks
-                      if i.iteration.status != IterationStatus('pending')]
+            'tasks': [task.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
+                      for cgsub_iter in self.command_group_submission_iterations
+                      for task in cgsub_iter.tasks
+                      if task.iteration.status != IterationStatus('pending')]
         }
         return out
 
@@ -2052,7 +2069,7 @@ class Task(Base):
     def get_working_directory_value(self):
         return self.get_working_directory().value
 
-    def get_stats(self, jsonable=True):
+    def get_stats(self, jsonable=True, datetime_dicts=False):
         'Get statistics for this task.'
         out = {
             'task_id': self.id_,
@@ -2073,27 +2090,39 @@ class Task(Base):
             'iteration': self.iteration.order_id,
         }
 
+        if datetime_dicts:
+            if self.duration:
+                out['duration'] = timedelta_to_dict(out['duration'])
+            if self.archive_duration:
+                out['archive_duration'] = timedelta_to_dict(out['archive_duration'])
+            if self.start_time:
+                out['start_time'] = datetime_to_dict(out['start_time'])
+            if self.end_time:
+                out['end_time'] = datetime_to_dict(out['end_time'])
+            if self.archive_start_time:
+                out['archive_start_time'] = datetime_to_dict(out['archive_start_time'])
+            if self.archive_end_time:
+                out['archive_end_time'] = datetime_to_dict(out['archive_end_time'])
+
         if jsonable:
 
-            if self.duration:
-                out['duration'] = format_time_delta(out['duration'])
+            if not datetime_dicts:
 
-            if self.archive_duration:
-                out['archive_duration'] = format_time_delta(out['archive_duration'])
+                if self.duration:
+                    out['duration'] = format_time_delta(out['duration'])
+                if self.archive_duration:
+                    out['archive_duration'] = format_time_delta(out['archive_duration'])
 
-            dt_fmt = r'%Y.%m.%d %H:%M:%S'
+                dt_fmt = r'%Y.%m.%d %H:%M:%S'
 
-            if self.start_time:
-                out['start_time'] = out['start_time'].strftime(dt_fmt)
-
-            if self.end_time:
-                out['end_time'] = out['end_time'].strftime(dt_fmt)
-
-            if self.archive_start_time:
-                out['archive_start_time'] = out['archive_start_time'].strftime(dt_fmt)
-
-            if self.archive_end_time:
-                out['archive_end_time'] = out['archive_end_time'].strftime(dt_fmt)
+                if self.start_time:
+                    out['start_time'] = out['start_time'].strftime(dt_fmt)
+                if self.end_time:
+                    out['end_time'] = out['end_time'].strftime(dt_fmt)
+                if self.archive_start_time:
+                    out['archive_start_time'] = out['archive_start_time'].strftime(dt_fmt)
+                if self.archive_end_time:
+                    out['archive_end_time'] = out['archive_end_time'].strftime(dt_fmt)
 
             if self.archive_status:
                 out['archive_status'] = self.archive_status.value

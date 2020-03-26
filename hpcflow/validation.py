@@ -37,6 +37,7 @@ PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
     'root_archive_excludes',
     'variable_scope',
     'variables',
+    'stats',
 ]
 
 CMD_GROUP_KEYS_REQ = [
@@ -59,6 +60,7 @@ CMD_GROUP_KEYS_GOOD = CMD_GROUP_KEYS_REQ + [
     'profile_name',
     'profile_order',
     'exec_order',
+    'stats',
 ]
 
 SHARED_KEYS_GOOD = list(set(PROFILE_KEYS_GOOD) & set(CMD_GROUP_KEYS_GOOD))
@@ -73,6 +75,7 @@ CMD_GROUP_DEFAULTS = {
     'scheduler_options': {},
     'output_dir': CONFIG['default_output_dir'],
     'error_dir': CONFIG['default_error_dir'],
+    'stats': False,
 }
 
 
