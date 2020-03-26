@@ -1497,9 +1497,6 @@ class CommandGroupSubmission(Base):
     def write_jobscript(self, dir_path):
         """Write the jobscript."""
 
-        # TOOD: should be in CGSI; I don't think so because need to have same jobscript for
-        # each iteration?
-
         cg_sub_first_iter = self.get_command_group_submission_iteration(
             self.submission.first_iteration)
 
