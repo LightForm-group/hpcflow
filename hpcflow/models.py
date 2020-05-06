@@ -1237,8 +1237,8 @@ class Submission(Base):
 
             for idx, i in enumerate(self.scheduler_groups):
 
-                max_num_tasks = i.get_max_num_tasks(iteration)
-                step_size = i.get_step_size(iteration)
+                max_num_tasks = i.get_max_num_tasks(self.first_iteration)
+                step_size = i.get_step_size(self.first_iteration)
 
                 # Make the scheduler group directory for each scheduler group:
                 sg_path = iter_path.joinpath('scheduler_group_{}'.format(idx))
@@ -2501,7 +2501,7 @@ class SchedulerGroup(object):
             num_outs_all.append(num_outs)
             num_outs_prev = num_outs
 
-        print('SchedulerGroup._get_num_outputs: num_outs_all: {}'.format(
+        print('SchedulerGroup.get_num_outputs: num_outs_all: {}'.format(
             num_outs_all), flush=True)
 
         return num_outs_all
