@@ -1166,7 +1166,10 @@ class Submission(Base):
                 print(('Submission.resolve_variable_values: dir var val: '
                        '{}.'.format(j)), flush=True)
 
-                var_vals_dat = resolve_variable_values(var_defns_rec, Path(j.value))
+                var_vals_dat = resolve_variable_values(
+                    var_defns_rec,
+                    root_directory.joinpath(j.value)
+                )
 
                 print(('Submission.resolve_variable_values: var_vals_dat: '
                        '{}.'.format(var_vals_dat)), flush=True)
@@ -1333,11 +1336,14 @@ class Submission(Base):
 
     def submit_jobscript(self, cmd, js_path, iteration):
 
-        proc = run(cmd, stdout=PIPE, stderr=PIPE)
+        cwd = str(self.workflow.directory)
+        proc = run(cmd, stdout=PIPE, stderr=PIPE, cwd=cwd)
         qsub_out = proc.stdout.decode().strip()
         qsub_err = proc.stderr.decode().strip()
-        print(qsub_out, flush=True)
-        print(qsub_err, flush=True)
+        if qsub_out:
+            print(qsub_out, flush=True)
+        if qsub_err:
+            print(qsub_err, flush=True)
 
         # Extract newly submitted job ID:
         pattern = r'[0-9]+'
