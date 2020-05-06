@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.2] - 2020.05.06
+
+### Fixed
+
+- Fixed issue where submission would fail if a directory that is not the current working directory was passed to `make_workflow` or `submit_workflow`.
+
 ## [0.1.1] - 2019.06.14
 
 ### Added

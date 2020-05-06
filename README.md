@@ -1,10 +1,4 @@
-<div style="text-align:center">
-    <img src="https://www.dropbox.com/s/snha33zkh4ganh7/logo.svg?dl=0"/>
-</div>
-
-# [WIP] hpcflow
-
-❗ This is a work-in-progress and not quite ready for real-world use.
+# hpcflow
 
 ## Installation
 
