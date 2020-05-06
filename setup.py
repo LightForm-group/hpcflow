@@ -54,11 +54,11 @@ setup(
         package_name: package_data,
     },
     install_requires=[
-        'click==7.0',
+        'click>7.0',
         'pyyaml',
-        'sqlalchemy==1.3.2',
+        'sqlalchemy>1.3.2',
         'dropbox',
-        'beautifultable==0.8.0'
+        'beautifultable'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
