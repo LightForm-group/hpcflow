@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.3] - 2020.05.07
+
+### Fixed
+
+- Fixed a typo in the console scripts that was causing installation to fail.
+
 ## [0.1.2] - 2020.05.06
 
 ### Fixed
