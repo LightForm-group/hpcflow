@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.4] - 2020.05.07
+
+### Changed
+
+- Added `__init__.py` to `archive` sub-package.
+
 ## [0.1.3] - 2020.05.07
 
 ### Fixed
