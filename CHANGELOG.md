@@ -1,15 +1,10 @@
 # Change Log
 
-## [0.1.4] - 2020.05.07
+## [0.1.3], [0.1.4], [0.1.5] - 2020.05.07
 
-### Changed
+### Packaging issues
 
-- Added `__init__.py` to `archive` sub-package.
-
-## [0.1.3] - 2020.05.07
-
-### Fixed
-
+- Added `__init__.py` to `archive` sub-package and nested sub-packages.
 - Fixed a typo in the console scripts that was causing installation to fail.
 
 ## [0.1.2] - 2020.05.06
