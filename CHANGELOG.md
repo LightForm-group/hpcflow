@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.6] - 2020.05.11
+
+### Fixed
+
+- Specify `six` version to ensure successful `dropbox` installation.
+
 ## [0.1.3], [0.1.4], [0.1.5] - 2020.05.07
 
 ### Packaging issues
