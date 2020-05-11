@@ -58,6 +58,7 @@ setup(
         'pyyaml',
         'sqlalchemy>1.3.2',
         'dropbox',
+        'six>1.11.0',  # for dropbox
         'beautifultable'
     ],
     classifiers=[
