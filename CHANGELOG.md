@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.7] - 2020.05.12
+
+### Changed
+
+- Removed a bunch of debugging `print`s.
+
 ## [0.1.6] - 2020.05.11
 
 ### Fixed
