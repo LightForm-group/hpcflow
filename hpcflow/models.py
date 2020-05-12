@@ -1118,19 +1118,19 @@ class Submission(Base):
 
             if cg_dirs_var_vals:
                 pass
-                print(('Submission.resolve_variable_values: found existing resolved '
-                       'directory variables: {}').format(cg_dirs_var_vals), flush=True)
+                # print(('Submission.resolve_variable_values: found existing resolved '
+                #        'directory variables: {}').format(cg_dirs_var_vals), flush=True)
 
             else:
 
-                print(('Submission.resolve_variable_values: trying to resolve directory '
-                       'variable values.'), flush=True)
+                # print(('Submission.resolve_variable_values: trying to resolve directory '
+                #        'variable values.'), flush=True)
 
                 # Directory variable has not yet been resolved; try:
                 try:
                     dir_var_vals_dat = dir_var.get_values(root_directory)
-                    print(('Submission.resolve_variable_values: found directories with '
-                           'values: {}.'.format(dir_var_vals_dat)), flush=True)
+                    # print(('Submission.resolve_variable_values: found directories with '
+                    #        'values: {}.'.format(dir_var_vals_dat)), flush=True)
 
                 except UnresolvedVariableError:
                     # Move on to next command group:
@@ -1141,8 +1141,8 @@ class Submission(Base):
                     if (j not in cg_dirs_var_vals_other_val or j == '.')
                 ]
 
-                print(('Submission.resolve_variable_values: new directories are: '
-                       '{}.'.format(dir_var_vals_dat_new)), flush=True)
+                # print(('Submission.resolve_variable_values: new directories are: '
+                #        '{}.'.format(dir_var_vals_dat_new)), flush=True)
 
                 # Add VarVals:
                 for val_idx, val in enumerate(dir_var_vals_dat_new):
@@ -1158,44 +1158,44 @@ class Submission(Base):
 
             var_defns_rec = i.variable_definitions_recursive
 
-            print(('Submission.resolve_variable_values: cg_dirs_var_vals: '
-                   '{}.'.format(cg_dirs_var_vals)), flush=True)
+            # print(('Submission.resolve_variable_values: cg_dirs_var_vals: '
+            #        '{}.'.format(cg_dirs_var_vals)), flush=True)
 
             for j in cg_dirs_var_vals:
 
-                print(('Submission.resolve_variable_values: dir var val: '
-                       '{}.'.format(j)), flush=True)
+                # print(('Submission.resolve_variable_values: dir var val: '
+                #        '{}.'.format(j)), flush=True)
 
                 var_vals_dat = resolve_variable_values(
                     var_defns_rec,
                     root_directory.joinpath(j.value)
                 )
 
-                print(('Submission.resolve_variable_values: var_vals_dat: '
-                       '{}.'.format(var_vals_dat)), flush=True)
+                # print(('Submission.resolve_variable_values: var_vals_dat: '
+                #        '{}.'.format(var_vals_dat)), flush=True)
 
                 for k, v in var_vals_dat.items():
 
-                    print(('Submission.resolve_variable_values: var_vals_dat k: '
-                           '{}; v: {}.'.format(k, v)), flush=True)
+                    # print(('Submission.resolve_variable_values: var_vals_dat k: '
+                    #        '{}; v: {}.'.format(k, v)), flush=True)
 
                     vals_dat = v['vals']
                     var_defn = self.workflow.get_variable_definition_by_name(k)
 
-                    print(('Submission.resolve_variable_values: vals_dat '
-                           '{}.'.format(vals_dat)), flush=True)
-                    print(('Submission.resolve_variable_values: var_defn '
-                           '{}.'.format(var_defn)), flush=True)
+                    # print(('Submission.resolve_variable_values: vals_dat '
+                    #        '{}.'.format(vals_dat)), flush=True)
+                    # print(('Submission.resolve_variable_values: var_defn '
+                    #        '{}.'.format(var_defn)), flush=True)
 
                     if not self.is_variable_resolved(var_defn, iteration, j):
 
-                        print(('Submission.resolve_variable_values: {} not resolved...'.format(
-                            var_defn)), flush=True)
+                        # print(('Submission.resolve_variable_values: {} not resolved...'.format(
+                        #     var_defn)), flush=True)
 
                         for val_idx, val in enumerate(vals_dat):
 
-                            print(('Submission.resolve_variable_values: val: {}...'.format(
-                                val)), flush=True)
+                            # print(('Submission.resolve_variable_values: val: {}...'.format(
+                            #     val)), flush=True)
 
                             VarValue(
                                 value=val,
@@ -2456,10 +2456,10 @@ class SchedulerGroup(object):
         # Get num_outputs for all previous cg subs in this scheduler group
         for idx, cg_sub in enumerate(self.command_group_submissions):
 
-            print('SchedulerGroup.get_num_outputs: cg_sub idx: {}'.format(idx), flush=True)
+            # print('SchedulerGroup.get_num_outputs: cg_sub idx: {}'.format(idx), flush=True)
 
-            print('SchedulerGroup.get_num_outputs: cg_sub_iters: ')
-            pprint(cg_sub.command_group_submission_iterations)
+            # print('SchedulerGroup.get_num_outputs: cg_sub_iters: ')
+            # pprint(cg_sub.command_group_submission_iterations)
 
             cg_sub_iter = None
             for i in cg_sub.command_group_submission_iterations:
@@ -2473,9 +2473,9 @@ class SchedulerGroup(object):
             is_job_array = cg_sub.command_group.is_job_array
             nesting = cg_sub.command_group.nesting
 
-            print('SchedulerGroup.get_num_outputs: is_job_array: {}'.format(
-                is_job_array), flush=True)
-            print('SchedulerGroup.get_num_outputs: nesting: {}'.format(nesting), flush=True)
+            # print('SchedulerGroup.get_num_outputs: is_job_array: {}'.format(
+            #     is_job_array), flush=True)
+            # print('SchedulerGroup.get_num_outputs: nesting: {}'.format(nesting), flush=True)
 
             if nesting == NestingType('nest'):  # or first_cmd_group:
                 num_outs = num_outs_prev
@@ -2493,16 +2493,16 @@ class SchedulerGroup(object):
                 # cg_sub.task_multiplicity is a dict of directory keys
                 num_outs *= sum(cg_sub_iter.get_task_multiplicity().values())
 
-                print('SchedulerGroup.get_num_outputs: cg_sub_iter.task_multiplicity: {}'.format(
-                    cg_sub_iter.get_task_multiplicity()), flush=True)
+                # print('SchedulerGroup.get_num_outputs: cg_sub_iter.task_multiplicity: {}'.format(
+                #     cg_sub_iter.get_task_multiplicity()), flush=True)
 
-            print('SchedulerGroup.get_num_outputs: num_outs: {}'.format(num_outs), flush=True)
+            # print('SchedulerGroup.get_num_outputs: num_outs: {}'.format(num_outs), flush=True)
 
             num_outs_all.append(num_outs)
             num_outs_prev = num_outs
 
-        print('SchedulerGroup.get_num_outputs: num_outs_all: {}'.format(
-            num_outs_all), flush=True)
+        # print('SchedulerGroup.get_num_outputs: num_outs_all: {}'.format(
+        #     num_outs_all), flush=True)
 
         return num_outs_all
 
