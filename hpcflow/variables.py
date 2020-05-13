@@ -5,7 +5,7 @@ from copy import deepcopy
 from pprint import pprint
 from pathlib import Path
 
-from hpcflow import VARS_LOOKUP, CONFIG
+from hpcflow.config import Config as CONFIG
 from hpcflow.utils import coerce_same_length
 
 
@@ -64,6 +64,7 @@ def get_all_var_defns_from_lookup(scope):
 
     """
 
+    VARS_LOOKUP = CONFIG.get('variable_lookup')
     all_scoped_vars = VARS_LOOKUP['scopes'][scope or '_default']
     scoped_vars = all_scoped_vars.get('variables', {})
     scoped_vars_template = all_scoped_vars.get('variables_from_template', {})
@@ -108,7 +109,7 @@ def resolve_sub_vars(var_defns, all_var_defns):
     """
 
     new_var_defns = {}
-    var_delims = CONFIG['variable_delimiters']
+    var_delims = CONFIG.get('variable_delimiters')
 
     for _, var_defn_i in var_defns.items():
 
@@ -130,7 +131,7 @@ def resolve_sub_vars(var_defns, all_var_defns):
 
 def select_cmd_group_var_names(commands, directory):
 
-    var_delims = CONFIG['variable_delimiters']
+    var_delims = CONFIG.get('variable_delimiters')
 
     # Retrieve the names of variables in `commands` and in `directory`:
     var_names = []

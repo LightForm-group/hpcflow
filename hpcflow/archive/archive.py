@@ -18,7 +18,7 @@ from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from hpcflow import CONFIG
+from hpcflow.config import Config as CONFIG
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
@@ -279,7 +279,7 @@ class Archive(Base):
 
         """
 
-        ignore = [CONFIG['hpcflow_directory']] + (exclude or [])
+        ignore = [CONFIG.get('hpcflow_directory')] + (exclude or [])
         start = datetime.now()
 
         try:

@@ -16,7 +16,7 @@ from sqlalchemy import (Column, Integer, DateTime, JSON, ForeignKey, Boolean,
 from sqlalchemy.orm import relationship, deferred, Session, reconstructor
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from hpcflow import CONFIG, FILE_NAMES
+from hpcflow.config import Config as CONFIG
 from hpcflow._version import __version__
 from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
@@ -127,7 +127,7 @@ class Workflow(Base):
             if 'directory' in i:
 
                 var_names = extract_variable_names(
-                    i['directory'], CONFIG['variable_delimiters'])
+                    i['directory'], CONFIG.get('variable_delimiters'))
                 if len(var_names) > 1:
                     raise NotImplementedError()
                 elif not var_names:
@@ -137,11 +137,11 @@ class Workflow(Base):
                     # Value is already a variable; no action.
                     continue
 
-            dir_var_defn_name = CONFIG['default_cmd_group_dir_var_name']
+            dir_var_defn_name = CONFIG.get('default_cmd_group_dir_var_name')
 
             command_groups[idx]['directory'] = '{1:}{0:}{2:}'.format(
                 dir_var_defn_name,
-                *CONFIG['variable_delimiters']
+                *CONFIG.get('variable_delimiters')
             )
 
             # Add new variable definition:
@@ -177,7 +177,7 @@ class Workflow(Base):
         for i in command_groups:
 
             dir_var_name = extract_variable_names(
-                i['directory'], CONFIG['variable_delimiters'])[0]
+                i['directory'], CONFIG.get('variable_delimiters'))[0]
 
             dir_var_defn = [i for i in self.variable_definitions
                             if i.name == dir_var_name][0]
@@ -740,7 +740,7 @@ class CommandGroup(Base):
         cmd_var_names = []
         for i in self.commands:
             cmd_var_names.extend(
-                extract_variable_names(i, CONFIG['variable_delimiters'])
+                extract_variable_names(i, CONFIG.get('variable_delimiters'))
             )
 
         return cmd_var_names
@@ -794,7 +794,7 @@ class VarDefinition(Base):
         """Check if the variable depends on any other variables."""
 
         if extract_variable_names(self.value,
-                                  CONFIG['variable_delimiters']):
+                                  CONFIG.get('variable_delimiters')):
             return False
         else:
             return True
@@ -802,7 +802,7 @@ class VarDefinition(Base):
     def get_dependent_variable_names(self):
         """Get the names of variables on which this variable depends."""
         return extract_variable_names(self.value,
-                                      CONFIG['variable_delimiters'])
+                                      CONFIG.get('variable_delimiters'))
 
     def get_multiplicity(self, submission):
         """Get the value multiplicity of this variable for a given
@@ -1258,7 +1258,7 @@ class Submission(Base):
                         all_dir_slots[k] = 'REPLACE_WITH_DIR_{}'.format(dir_idx)
 
                     wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(
-                        cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']))
+                        cg_sub.command_group_exec_order, CONFIG.get('working_dirs_file_ext')))
 
                     # Make the working directory template files for each cmd group:
                     with wk_dirs_path.open('w') as handle:
@@ -1660,7 +1660,7 @@ class CommandGroupSubmission(Base):
         )
 
         for var_name, var_val_all in var_vals_normed.items():
-            var_fn = 'var_{}{}'.format(var_name, CONFIG['variable_file_ext'])
+            var_fn = 'var_{}{}'.format(var_name, CONFIG.get('variable_file_ext'))
             var_file_path = var_values_task_dir.joinpath(var_fn)
             with var_file_path.open('w') as handle:
                 for i in var_val_all:
@@ -1673,7 +1673,7 @@ class CommandGroupSubmission(Base):
             'do'
         ]
 
-        delims = CONFIG['variable_delimiters']
+        delims = CONFIG.get('variable_delimiters')
         lns_cmd = []
         for i in self.command_group.commands:
             if self.command_group.variable_definitions:
@@ -1712,7 +1712,7 @@ class CommandGroupSubmission(Base):
 
             fd_idx = idx + 3
 
-            var_fn = 'var_{}{}'.format(i.name, CONFIG['variable_file_ext'])
+            var_fn = 'var_{}{}'.format(i.name, CONFIG.get('variable_file_ext'))
             var_file_path = ('$ITER_DIR/scheduler_group_{}/var_values'
                              '/$ZEROPAD_TASK_ID/{}').format(
                                  self.scheduler_group_index[0], var_fn)
@@ -1747,7 +1747,7 @@ class CommandGroupSubmission(Base):
         cmd_path = project.hf_dir.joinpath(
             'workflow_{}'.format(self.submission.workflow.id_),
             'submit_{}'.format(self.submission.order_id),
-            'cmd_{}{}'.format(self.command_group_exec_order, CONFIG['jobscript_ext']),
+            'cmd_{}{}'.format(self.command_group_exec_order, CONFIG.get('jobscript_ext')),
         )
         with cmd_path.open('w') as handle:
             handle.write(cmd_lns)
@@ -1757,7 +1757,7 @@ class CommandGroupSubmission(Base):
 
         # List of Paths to exclude, relative to `self.submission.workflow.directory`:
         excluded_paths = [
-            Path(CONFIG['hpcflow_directory'])] + self.submission.workflow.profile_files
+            Path(CONFIG.get('hpcflow_directory'))] + self.submission.workflow.profile_files
 
         out_dir = Path(self.command_group.scheduler.output_dir)
         err_dir = Path(self.command_group.scheduler.error_dir)
@@ -1780,10 +1780,10 @@ class CommandGroupSubmission(Base):
             'submit_{}'.format(self.submission.order_id),
             'iter_{}'.format(iteration.order_id),
             '{}_{}_{}{}'.format(
-                FILE_NAMES['alt_scratch_exc_file'],
+                CONFIG.get('alt_scratch_exc_file'),
                 self.command_group_exec_order,
                 task.order_id,
-                FILE_NAMES['alt_scratch_exc_file_ext'],
+                CONFIG.get('alt_scratch_exc_file_ext'),
             ),
         )
 
@@ -2402,7 +2402,7 @@ class CommandGroupSubmissionIteration(Base):
             'submit_{}'.format(cg_sub.submission.order_id),
             'iter_{}'.format(self.iteration.order_id),
             'working_dirs_{}{}'.format(
-                cg_sub.command_group_exec_order, CONFIG['working_dirs_file_ext']),
+                cg_sub.command_group_exec_order, CONFIG.get('working_dirs_file_ext')),
         )
 
         with wk_dirs_path.open() as handle:

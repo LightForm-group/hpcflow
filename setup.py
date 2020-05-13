@@ -55,7 +55,7 @@ setup(
     },
     install_requires=[
         'click>7.0',
-        'pyyaml',
+        'ruamel.yaml',
         'sqlalchemy>1.3.2',
         'dropbox',
         'six>1.11.0',  # for dropbox
@@ -65,7 +65,6 @@ setup(
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Operating System :: POSIX',

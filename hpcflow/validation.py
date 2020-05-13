@@ -7,76 +7,8 @@ constructing `Workflow` and `CommandGroup` instances.
 
 """
 
-from hpcflow import CONFIG
+from hpcflow.config import Config as CONFIG
 from hpcflow.nesting import NestingType
-
-
-PROFILE_KEYS_REQ = [
-    'command_groups',
-    'profile_name',
-    'profile_order',
-]
-
-PROFILE_KEYS_GOOD = PROFILE_KEYS_REQ + [
-    'alternate_scratch',
-    'archive',
-    'archive_excludes',
-    'directory',
-    'inherits',
-    'is_job_array',
-    'loop',
-    'modules',
-    'sources',
-    'nesting',
-    'scheduler',
-    'scheduler_options',
-    'output_dir',
-    'error_dir',
-    'pre_commands',
-    'root_archive',
-    'root_archive_excludes',
-    'variable_scope',
-    'variables',
-    'stats',
-]
-
-CMD_GROUP_KEYS_REQ = [
-    'commands',
-]
-
-CMD_GROUP_KEYS_GOOD = CMD_GROUP_KEYS_REQ + [
-    'alternate_scratch',
-    'archive',
-    'archive_excludes',
-    'directory',
-    'is_job_array',
-    'modules',
-    'sources',
-    'nesting',
-    'scheduler',
-    'scheduler_options',
-    'output_dir',
-    'error_dir',
-    'profile_name',
-    'profile_order',
-    'exec_order',
-    'stats',
-]
-
-SHARED_KEYS_GOOD = list(set(PROFILE_KEYS_GOOD) & set(CMD_GROUP_KEYS_GOOD))
-
-CMD_GROUP_DEFAULTS = {
-    'is_job_array': True,
-    'nesting': None,
-    'directory': '',
-    'archive': None,
-    'archive_excludes': [],
-    'scheduler': 'direct',
-    'scheduler_options': {},
-    'output_dir': CONFIG['default_output_dir'],
-    'error_dir': CONFIG['default_error_dir'],
-    'stats': False,
-}
 
 
 def validate_workflow(workflow_dict):
@@ -103,8 +35,8 @@ def validate_job_profile(job_profile):
 
     # Validate profile keys:
     keys = job_profile.keys()
-    missing_keys = list(set(PROFILE_KEYS_REQ) - set(keys))
-    bad_keys = list(set(keys) - set(PROFILE_KEYS_GOOD))
+    missing_keys = list(set(CONFIG.get('profile_keys_required')) - set(keys))
+    bad_keys = list(set(keys) - set(CONFIG.get('profile_keys_allowed')))
 
     # Check required keys exist:
     if len(missing_keys) > 0:

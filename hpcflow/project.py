@@ -10,16 +10,17 @@ import shutil
 from pathlib import Path
 from subprocess import run
 
-from hpcflow import CONFIG, PROJECTS_DB_DIR, DB_NAME
+from hpcflow.config import Config
 from hpcflow.utils import get_random_hex
 
 
 class Project(object):
 
-    def __init__(self, dir_path, clean=False):
+    def __init__(self, dir_path, config_dir=None, clean=False):
 
+        Config.set_config(config_dir)
         self.dir_path = Path(dir_path or '').resolve()
-        self.hf_dir = self.dir_path.joinpath(CONFIG['hpcflow_directory'])
+        self.hf_dir = self.dir_path.joinpath(Config.get('hpcflow_directory'))
 
         if clean:
             self.clean()
@@ -27,7 +28,7 @@ class Project(object):
         if not self.hf_dir.exists():
 
             self.db_directory_name = get_random_hex(10)
-            self.db_path = self.project_db_dir.joinpath(DB_NAME).as_posix()
+            self.db_path = self.project_db_dir.joinpath(Config.get('DB_name')).as_posix()
 
             self.hf_dir.mkdir()
             self.project_db_dir.mkdir()
@@ -40,7 +41,8 @@ class Project(object):
             with self.hf_dir.joinpath('db_path').open() as handle:
                 self.db_path = handle.read().strip()
                 self.db_directory_name = Path(
-                    self.db_path).relative_to(PROJECTS_DB_DIR).parent
+                    self.db_path).relative_to(
+                        Config.get('projects_DB_dir')).parent
 
     @property
     def db_uri(self):
@@ -48,7 +50,7 @@ class Project(object):
 
     @property
     def project_db_dir(self):
-        return PROJECTS_DB_DIR.joinpath(self.db_directory_name)
+        return Config.get('projects_DB_dir').joinpath(self.db_directory_name)
 
     @property
     def db_dir_symlink(self):

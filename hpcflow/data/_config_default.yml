@@ -1,8 +1,0 @@
-profile_filename_fmt: <<order>>.<<name>>.yml
-jobscript_dir: .hpcflow
-directory_list_filename_fmt: dir_list.txt
-confirm_before_submit: true
-profile_ext: '.yml'
-jobscript_ext: '.sh'
-variable_file_ext: '.txt'
-python_module_load: apps/anaconda3/5.2.0

@@ -6,18 +6,20 @@ construct a Workflow.
 """
 
 from pathlib import Path
-from pprint import pprint
 
 import yaml
 
-from hpcflow import CONFIG, PROFILES_DIR
+from hpcflow.config import Config as CONFIG
 from hpcflow.validation import (
-    validate_task_multiplicity, validate_job_profile,
-    validate_job_profile_list, CMD_GROUP_DEFAULTS, SHARED_KEYS_GOOD
+    validate_task_multiplicity,
+    validate_job_profile,
+    validate_job_profile_list,
 )
 from hpcflow.variables import (
-    select_cmd_group_var_definitions, get_all_var_defns_from_lookup,
-    get_variabled_filename_regex, find_variabled_filenames,
+    select_cmd_group_var_definitions,
+    get_all_var_defns_from_lookup,
+    get_variabled_filename_regex,
+    find_variabled_filenames,
 )
 
 
@@ -32,11 +34,11 @@ def resolve_root_archive(root_archive_name, archives):
     """
 
     try:
-        arch_defn = CONFIG['archives'][root_archive_name]
+        arch_defn = CONFIG.get('archives')[root_archive_name]
     except KeyError:
         msg = ('An archive called "{}" was not found in the '
                'configuration file. Available archives are: {}')
-        raise ValueError(msg.format(root_archive_name, CONFIG['archives']))
+        raise ValueError(msg.format(root_archive_name, CONFIG.get('archives')))
 
     existing_idx = None
     for k_idx, k in enumerate(archives):
@@ -63,11 +65,11 @@ def resolve_archives(cmd_group, archives):
     arch_name = cmd_group.pop('archive', None)
     if arch_name:
         try:
-            arch_defn = CONFIG['archives'][arch_name]
+            arch_defn = CONFIG.get('archives')[arch_name]
         except KeyError:
             msg = ('An archive called "{}" was not found in the '
                    'configuration file. Available archives are: {}')
-            raise ValueError(msg.format(arch_name, CONFIG['archives']))
+            raise ValueError(msg.format(arch_name, CONFIG.get('archives')))
 
         existing_idx = None
         for k_idx, k in enumerate(archives):
@@ -160,11 +162,14 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         for j in i['command_groups']:
 
             # Populate with defaults first:
-            cmd_group = {
-                **CMD_GROUP_DEFAULTS,
-            }
+            cmd_group = {**CONFIG.get('cmd_group_defaults')}
+
             # Overwrite with profile-level parameters:
-            for k in SHARED_KEYS_GOOD:
+            SHARED_KEYS = (
+                set(CONFIG.get('profile_keys_allowed')) &
+                set(CONFIG.get('cmd_group_keys_allowed'))
+            )
+            for k in SHARED_KEYS:
                 if i.get(k) is not None:
                     cmd_group.update({k: i[k]})
             # Overwrite with command-level parameters:
@@ -223,8 +228,8 @@ def parse_job_profiles(dir_path=None, profile_list=None):
 def parse_profile_filenames(dir_path, profile_list=None):
     """Resolve name and order variables embedded in profile filenames."""
 
-    fn_fmt = CONFIG['profile_filename_fmt']
-    var_delims = CONFIG['variable_delimiters']
+    fn_fmt = CONFIG.get('profile_filename_fmt')
+    var_delims = CONFIG.get('variable_delimiters')
 
     # There are only two allowed profile filename-encodable variables:
     var_value = {
@@ -285,7 +290,7 @@ def resolve_job_profile(job_profile_path, filename_var_values,
     common_profiles_dir : str or Path
         Directory that contains common profiles. By default, set to `None`, in
         which case, the default profile directory is used (which is within the
-        hpcflow data directory).
+        hpcflow configuration directory).
 
     Returns
     -------
@@ -298,7 +303,7 @@ def resolve_job_profile(job_profile_path, filename_var_values,
     if common_profiles_dir:
         common_profiles_dir = Path(common_profiles_dir)
     else:
-        common_profiles_dir = PROFILES_DIR
+        common_profiles_dir = CONFIG.get('profiles_dir')
 
     # Get a list of all common profile file names (without any extension):
     prof_names = []
@@ -324,7 +329,7 @@ def resolve_job_profile(job_profile_path, filename_var_values,
                 parent_profile_name, common_profiles_dir))
 
         parent_spec_path = common_profiles_dir.joinpath(
-            parent_profile_name + CONFIG['profile_ext'])
+            parent_profile_name + CONFIG.get('profile_ext'))
 
         with parent_spec_path.open() as handle:
             parent_profile = yaml.safe_load(handle)
