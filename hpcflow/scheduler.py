@@ -69,7 +69,8 @@ class SunGridEngine(Scheduler):
 
         super().__init__(options=options, output_dir=output_dir, error_dir=error_dir)
 
-    def get_formatted_options(self, max_num_tasks, task_step_size, user_opt=True):
+    def get_formatted_options(self, max_num_tasks, task_step_size, user_opt=True,
+                              name=None):
 
         opts = ['#$ -{}'.format(i) for i in SunGridEngine.REQ_OPT]
         opts.append('#$ -{} {}'.format(
@@ -82,6 +83,10 @@ class SunGridEngine(Scheduler):
         )
         opts += ['#$ -{} {}'.format(i, j)
                  for i, j in SunGridEngine.REQ_PARAMETRISED_OPT.items()]
+
+        if name:
+            opts += [f'#$ -N {name}']
+
         if user_opt:
             opts += ['#$ -{} {}'.format(k, v).strip()
                      for k, v in sorted(self.options.items())]
@@ -92,7 +97,7 @@ class SunGridEngine(Scheduler):
 
     def write_jobscript(self, dir_path, workflow_directory, command_group_order,
                         max_num_tasks, task_step_size, environment, archive,
-                        alternate_scratch_dir, command_group_submission_id):
+                        alternate_scratch_dir, command_group_submission_id, name):
         """Write the jobscript.
 
         Parameters
@@ -215,7 +220,8 @@ class SunGridEngine(Scheduler):
 
         js_lines = ([SunGridEngine.SHEBANG, ''] +
                     about_msg + [''] +
-                    self.get_formatted_options(max_num_tasks, task_step_size) + [''] +
+                    self.get_formatted_options(max_num_tasks, task_step_size, name=name) +
+                    [''] +
                     define_dirs_A + [''] +
                     write_cmd_exec + [''] +
                     define_dirs_B + [''] +

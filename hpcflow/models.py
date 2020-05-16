@@ -500,6 +500,7 @@ class CommandGroup(Base):
     directory_variable_id = Column(Integer, ForeignKey('var_definition.id'))
     archive_id = Column(Integer, ForeignKey('archive.id'), nullable=True)
 
+    name = Column(String(255), nullable=True)
     commands = Column(JSON)
     is_job_array = Column(Boolean)
     exec_order = Column(Integer)
@@ -541,7 +542,7 @@ class CommandGroup(Base):
                  exec_order=None, nesting=None, environment=None, scheduler=None,
                  profile_name=None, profile_order=None, archive=None,
                  archive_excludes=None, archive_directory=None, alternate_scratch=None,
-                 stats=None):
+                 stats=None, name=None):
         """Method to initialise a new CommandGroup.
 
         Parameters
@@ -606,6 +607,7 @@ class CommandGroup(Base):
         self.profile_name = profile_name
         self.profile_order = profile_order
         self.stats = stats
+        self.name = name
 
         self.archive = archive
         self.archive_excludes = archive_excludes
@@ -1516,7 +1518,8 @@ class CommandGroupSubmission(Base):
             environment=self.command_group.environment,
             archive=self.command_group.archive is not None,
             alternate_scratch_dir=self.alternate_scratch_dir,
-            command_group_submission_id=self.id_
+            command_group_submission_id=self.id_,
+            name=self.command_group.name,
         )
 
         js_stats_path = None

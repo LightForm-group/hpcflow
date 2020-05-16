@@ -54,6 +54,7 @@ class Config(object):
         'profile_order',
         'exec_order',
         'stats',
+        'job_name',
     ]
     __CMD_GROUP_DEFAULTS = {
         'is_job_array': True,
