@@ -504,8 +504,7 @@ class CommandGroup(Base):
     is_job_array = Column(Boolean)
     exec_order = Column(Integer)
     nesting = Column(Enum(NestingType), nullable=True)
-    modules = Column(JSON, nullable=True)
-    sources = Column(JSON, nullable=True)
+    environment = Column(JSON, nullable=True)
     _scheduler = Column('scheduler', JSON)
     profile_name = Column(String(255), nullable=True)
     profile_order = Column(Integer, nullable=True)
@@ -539,8 +538,8 @@ class CommandGroup(Base):
         return out
 
     def __init__(self, commands, directory_var, is_job_array=True,
-                 exec_order=None, nesting=None, modules=None, sources=None,
-                 scheduler=None, profile_name=None, profile_order=None, archive=None,
+                 exec_order=None, nesting=None, environment=None, scheduler=None,
+                 profile_name=None, profile_order=None, archive=None,
                  archive_excludes=None, archive_directory=None, alternate_scratch=None,
                  stats=None):
         """Method to initialise a new CommandGroup.
@@ -570,12 +569,9 @@ class CommandGroup(Base):
             since a given task in the current command group will only begin
             once its corresponding task in the previous command group has
             completed. By default, set to `None`.
-        modules : list of str, optional
-            List of modules that are to be loaded using the `module load`
-            command, in order to ensure successful execution of the commands.
-            By default set to `None`, such that no modules are loaded.
-        sources : list of str, optional
-            List of scripts to source.
+        environment : list of str, optional
+            List of commands to be run to set up the environment for the command group. By
+            default set to `None`.
         scheduler : dict, optional
             Scheduler type and options to be passed directly to the scheduler. By default,
             `None`, in which case the DirectExecution scheduler is used and no additional
@@ -604,8 +600,7 @@ class CommandGroup(Base):
         self.is_job_array = is_job_array
         self.exec_order = exec_order
         self.nesting = nesting
-        self.modules = modules
-        self.sources = sources
+        self.environment = environment
         self.scheduler = scheduler
         self.directory_variable = directory_var
         self.profile_name = profile_name
@@ -1518,8 +1513,7 @@ class CommandGroupSubmission(Base):
             max_num_tasks=self.scheduler_group.get_max_num_tasks(
                 self.submission.first_iteration),
             task_step_size=cg_sub_first_iter.step_size,
-            modules=self.command_group.modules,
-            sources=self.command_group.sources,
+            environment=self.command_group.environment,
             archive=self.command_group.archive is not None,
             alternate_scratch_dir=self.alternate_scratch_dir,
             command_group_submission_id=self.id_

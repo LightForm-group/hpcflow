@@ -91,7 +91,7 @@ class SunGridEngine(Scheduler):
         return opts
 
     def write_jobscript(self, dir_path, workflow_directory, command_group_order,
-                        max_num_tasks, task_step_size, modules, sources, archive,
+                        max_num_tasks, task_step_size, environment, archive,
                         alternate_scratch_dir, command_group_submission_id):
         """Write the jobscript.
 
@@ -183,10 +183,8 @@ class SunGridEngine(Scheduler):
 
         log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
 
-        if modules:
-            loads = [''] + ['module load {}'.format(i) for i in sorted(modules)] + ['']
-        elif sources:
-            loads = [''] + ['source {}'.format(i) for i in sorted(sources)] + ['']
+        if environment:
+            loads = [''] + environment + ['']
         else:
             loads = []
 
@@ -317,7 +315,7 @@ class DirectExecution(Scheduler):
         super().__init__(options=options, output_dir=output_dir, error_dir=error_dir)
 
     def write_jobscript(self, dir_path, workflow_directory, command_group_order,
-                        max_num_tasks, task_step_size, modules, sources, archive,
+                        max_num_tasks, task_step_size, environment, archive,
                         alternate_scratch_dir, command_group_submission_id):
         """Write the jobscript.
 
@@ -410,10 +408,8 @@ class DirectExecution(Scheduler):
 
         log_stuff.append(r'printf "\n" >> $LOG_PATH 2>&1')
 
-        if modules:
-            loads = [''] + ['module load {}'.format(i) for i in sorted(modules)] + ['']
-        elif sources:
-            loads = [''] + ['source {}'.format(i) for i in sorted(sources)] + ['']
+        if environment:
+            loads = [''] + environment + ['']
         else:
             loads = []
 

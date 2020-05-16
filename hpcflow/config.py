@@ -22,8 +22,7 @@ class Config(object):
         'inherits',
         'is_job_array',
         'loop',
-        'modules',
-        'sources',
+        'environment',
         'nesting',
         'scheduler',
         'scheduler_options',
@@ -45,8 +44,7 @@ class Config(object):
         'archive_excludes',
         'directory',
         'is_job_array',
-        'modules',
-        'sources',
+        'environment',
         'nesting',
         'scheduler',
         'scheduler_options',
@@ -177,9 +175,6 @@ class Config(object):
         )
 
         Config.is_set = True
-
-        print('Config.__conf:')
-        print(Config.__conf)
 
     @staticmethod
     def get(name):
