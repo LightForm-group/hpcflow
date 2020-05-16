@@ -126,9 +126,11 @@ class SunGridEngine(Scheduler):
             'TASK_IDX=$((($SGE_TASK_ID - 1)/{}))'.format(task_step_size),
         ]
 
-        write_cmd_exec = [('hpcflow write-runtime-files -d $ROOT_DIR {} $TASK_IDX '
-                           '$ITER_IDX > $LOG_PATH 2>&1').format(
-                               command_group_submission_id)]
+        write_cmd_exec = [(
+            f'hpcflow write-runtime-files --directory $ROOT_DIR '
+            f'--config-dir {CONFIG.get("config_dir")} '
+            f'{command_group_submission_id} $TASK_IDX $ITER_IDX > $LOG_PATH 2>&1'
+        )]
 
         define_dirs_B = [
             'INPUTS_DIR_REL=`sed -n "${{SGE_TASK_ID}}p" {}`'.format(wk_dirs_path),
@@ -188,22 +190,26 @@ class SunGridEngine(Scheduler):
         else:
             loads = []
 
-        set_task_args = '-d $ROOT_DIR {} $TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1'.format(
-            command_group_submission_id)
+        set_task_args = (f'--directory $ROOT_DIR '
+                         f'--config-dir {CONFIG.get("config_dir")} '
+                         f'{command_group_submission_id} '
+                         f'$TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1')
         cmd_exec = [
-            'hpcflow set-task-start {}'.format(set_task_args),
-            '',
-            'cd $INPUTS_DIR_SCRATCH',
-            '. $SUBMIT_DIR/{}'.format(cmd_fn),
-            '',
-            'hpcflow set-task-end {}'.format(set_task_args),
+            f'hpcflow set-task-start {set_task_args}',
+            f'',
+            f'cd $INPUTS_DIR_SCRATCH',
+            f'. $SUBMIT_DIR/{cmd_fn}',
+            f'',
+            f'hpcflow set-task-end {set_task_args}',
         ]
 
         arch_lns = []
         if archive:
             arch_lns = [
-                ('hpcflow archive -d $ROOT_DIR {} $TASK_IDX $ITER_IDX >> '
-                 '$LOG_PATH 2>&1'.format(command_group_submission_id)),
+                (f'hpcflow archive --directory $ROOT_DIR '
+                 f'--config-dir {CONFIG.get("config_dir")} '
+                 f'{command_group_submission_id} '
+                 f'$TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1'),
                 ''
             ]
 
