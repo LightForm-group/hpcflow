@@ -22,7 +22,7 @@ from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
 from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
-from hpcflow.scheduler import SunGridEngine, DirectExecution
+from hpcflow.scheduler import SunGridEngine
 from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex, datetime_to_dict, timedelta_to_dict
 from hpcflow.validation import validate_task_multiplicity
 from hpcflow.variables import (
@@ -32,7 +32,6 @@ from hpcflow.variables import (
 
 SCHEDULER_MAP = {
     'sge': SunGridEngine,
-    'direct': DirectExecution,
 }
 
 
