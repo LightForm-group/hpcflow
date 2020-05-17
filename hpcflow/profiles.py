@@ -90,39 +90,8 @@ def resolve_archives(cmd_group, archives):
         cmd_group.pop('archive_excludes', None)
 
 
-def parse_job_profiles(dir_path=None, profile_list=None):
-    """Parse YAML file profiles into a form suitable for `models.Workflow`
-    initialisation.
-
-    Parameters
-    ----------
-    dir_path : Path
-        The directory in which the Workflow will be generated. In addition to
-        the profile file paths explicitly declared in the `profiles` parameter,
-        this directory (`dir_path`) will be searched for profile files.
-    profile_list : list of (str or Path), optional
-        List of YAML profile file paths to be used to construct the Workflow.
-        If `None` and if no profiles are found in `dir_path` according to the
-        global configuration for the expected format of profile files, then a
-        `ValueError` is raised.
-
-    Returns
-    -------
-    workflow_dict : dict
-        Dict representing the workflow, with two keys: `command_groups` and
-        `variable_definitions`.
-
-    """
-
-    profile_matches = parse_profile_filenames(dir_path, profile_list)
-
-    all_profiles = []
-    for job_profile_path, var_values in profile_matches.items():
-        all_profiles.append(
-            resolve_job_profile(job_profile_path, var_values)
-        )
-
-    all_profiles = validate_job_profile_list(all_profiles)
+def prepare_workflow_dict(*profile_dicts):
+    'Prepare the workflow dict for initialisation as a Workflow object.'
 
     # Form command group list, where profile-level parameters are copied to the
     # child command groups, but equivalent command group parameters take
@@ -135,7 +104,8 @@ def parse_job_profiles(dir_path=None, profile_list=None):
     loop = None
     root_arch_exc = []
     root_arch_num = 0
-    for i in all_profiles:
+    profile_files = []
+    for i in profile_dicts:
 
         pre_commands.extend(i.get('pre_commands') or [])
 
@@ -159,7 +129,7 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         profile_cmd_groups = []
         # Form command group list:
         exec_order_add = len(command_groups)
-        for j in i['command_groups']:
+        for cmd_group_idx, j in enumerate(i['command_groups']):
 
             # Populate with defaults first:
             cmd_group = {**CONFIG.get('cmd_group_defaults')}
@@ -174,6 +144,10 @@ def parse_job_profiles(dir_path=None, profile_list=None):
                     cmd_group.update({k: i[k]})
             # Overwrite with command-level parameters:
             cmd_group.update(**j)
+
+            if 'exec_order' not in cmd_group:
+                cmd_group['exec_order'] = cmd_group_idx
+
             cmd_group['exec_order'] += exec_order_add
 
             # Combine scheduler options with scheduler name:
@@ -205,6 +179,9 @@ def parse_job_profiles(dir_path=None, profile_list=None):
 
             var_definitions.update(cmd_group_var_defns)
 
+        if 'profile_file' in i:
+            profile_files.append(i['profile_file'])
+
     root_arch_idx = None
     if root_arch_name:
         root_arch_idx = resolve_root_archive(root_arch_name, archives)
@@ -216,13 +193,52 @@ def parse_job_profiles(dir_path=None, profile_list=None):
         'archives': archives,
         'root_archive_idx': root_arch_idx,
         'root_archive_excludes': root_arch_exc,
-        'profile_files': list(profile_matches.keys()),
+        'profile_files': profile_files,
     }
 
     if loop:
         workflow.update({'loop': loop})
 
     return workflow
+
+
+def parse_job_profiles(dir_path=None, profile_list=None):
+    """Parse YAML file profiles into a form suitable for `models.Workflow`
+    initialisation.
+
+    Parameters
+    ----------
+    dir_path : Path
+        The directory in which the Workflow will be generated. In addition to
+        the profile file paths explicitly declared in the `profiles` parameter,
+        this directory (`dir_path`) will be searched for profile files.
+    profile_list : list of (str or Path), optional
+        List of YAML profile file paths to be used to construct the Workflow.
+        If `None` and if no profiles are found in `dir_path` according to the
+        global configuration for the expected format of profile files, then a
+        `ValueError` is raised.
+
+    Returns
+    -------
+    workflow_dict : dict
+        Dict representing the workflow, with two keys: `command_groups` and
+        `variable_definitions`.
+
+    """
+
+    profile_matches = parse_profile_filenames(dir_path, profile_list)
+
+    print(f'profile_matches: {profile_matches}')
+
+    all_profiles = []
+    for job_profile_path, var_values in profile_matches.items():
+        all_profiles.append(
+            resolve_job_profile(job_profile_path, var_values)
+        )
+
+    all_profiles = validate_job_profile_list(all_profiles)
+
+    return prepare_workflow_dict(*all_profiles)
 
 
 def parse_profile_filenames(dir_path, profile_list=None):
@@ -379,5 +395,6 @@ def resolve_job_profile(job_profile_path, filename_var_values,
     com_err_msg = '[Job profile name: "{}"]'.format(job_profile_path.name)
     cmd_groups = validate_task_multiplicity(cmd_groups, com_err_msg)
     merged_profile['command_groups'] = cmd_groups
+    merged_profile['profile_file'] = job_profile_path
 
     return merged_profile

@@ -14,12 +14,12 @@ from beautifultable import BeautifulTable
 
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, Submission, CommandGroupSubmission
-from hpcflow.profiles import parse_job_profiles
+from hpcflow.profiles import parse_job_profiles, prepare_workflow_dict
 from hpcflow.project import Project
 
 
-def make_workflow(dir_path=None, profile_list=None, json_file=None,
-                  json_str=None, clean=False, config_dir=None):
+def make_workflow(dir_path=None, profile_list=None, json_file=None, json_str=None,
+                  workflow_dict=None, clean=False, config_dir=None):
     """Generate a new Workflow and add it to the local database.
 
     Parameters
@@ -39,6 +39,8 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         `None`.
     json_str : str, optional
         JSON string that represents a Workflow. By default, set to `None`.
+    workflow_dict : dict, optional
+        Dict representing the workflow to generate.
     clean : bool, optional
         If True, all existing hpcflow data will be removed from `dir_path`.
         Useful for debugging.
@@ -54,9 +56,11 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
 
     """
 
-    not_nones = sum([i is not None for i in [profile_list, json_file, json_str]])
+    opts = [profile_list, json_file, json_str, workflow_dict]
+    not_nones = sum([i is not None for i in opts])
     if not_nones > 1:
-        msg = ('Specify only one of `profile_list`, `json_file` or `json_str`.')
+        msg = ('Specify only one of `profile_list`, `json_file`, `json_str` or '
+               '`workflow_dict`.')
         raise ValueError(msg)
 
     project = Project(dir_path, config_dir, clean=clean)
@@ -74,11 +78,14 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         # Get workflow from YAML profiles:
         workflow_dict = parse_job_profiles(project.dir_path, profile_list)
 
+    else:
+        workflow_dict = prepare_workflow_dict(workflow_dict)
+
     Session = init_db(project, check_exists=False)
     session = Session()
 
-    # print('workflow_dict:')
-    # pprint(workflow_dict)
+    print('workflow_dict:')
+    pprint(workflow_dict)
 
     workflow = Workflow(directory=project.dir_path, **workflow_dict)
 
