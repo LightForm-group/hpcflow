@@ -127,7 +127,7 @@ class Config(object):
             with config_file.open('w'):
                 pass
 
-        print(f'Loading config from {config_file}')
+        print(f'Loading hpcflow config from {config_file}')
 
         yaml = YAML()
         config_dat = yaml.load(config_file) or {}

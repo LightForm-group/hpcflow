@@ -84,9 +84,6 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None, json_str=Non
     Session = init_db(project, check_exists=False)
     session = Session()
 
-    print('workflow_dict:')
-    pprint(workflow_dict)
-
     workflow = Workflow(directory=project.dir_path, **workflow_dict)
 
     session.add(workflow)
