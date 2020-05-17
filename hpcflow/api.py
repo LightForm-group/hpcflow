@@ -65,10 +65,12 @@ def make_workflow(dir_path=None, profile_list=None, json_file=None,
         workflow_dict = json.loads(json_str)
 
     elif json_file:
+        json_file = Path(json_file).resolve()
         with Path(json_file).open() as handle:
             workflow_dict = json.load(handle)
 
-    else:
+    elif profile_list:
+        profile_list = [Path(i).resolve() for i in profile_list]
         # Get workflow from YAML profiles:
         workflow_dict = parse_job_profiles(project.dir_path, profile_list)
 
