@@ -239,7 +239,8 @@ class SunGridEngine(Scheduler):
         return js_path
 
     def write_stats_jobscript(self, dir_path, workflow_directory, command_group_order,
-                              max_num_tasks, task_step_size, command_group_submission_id):
+                              max_num_tasks, task_step_size, command_group_submission_id,
+                              name):
 
         js_ext = CONFIG.get('jobscript_ext')
         js_name = 'st_{}'.format(command_group_order)
@@ -271,11 +272,14 @@ class SunGridEngine(Scheduler):
             r'printf "TASK_IDX:\t ${TASK_IDX}\n" >> $LOG_PATH 2>&1',
         ]
 
-        set_task_args = '-d $ROOT_DIR {} $TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1'.format(
-            command_group_submission_id)
-        cmd_exec = ['hpcflow get-scheduler-stats {}'.format(set_task_args)]
+        cmd_exec = [(
+            f'hpcflow get-scheduler-stats --directory $ROOT_DIR '
+            f'--config-dir {CONFIG.get("config_dir")} '
+            f'{command_group_submission_id} $TASK_IDX $ITER_IDX >> $LOG_PATH 2>&1'
+        )]
 
-        opt = self.get_formatted_options(max_num_tasks, task_step_size, user_opt=False)
+        opt = self.get_formatted_options(max_num_tasks, task_step_size, user_opt=False,
+                                         name=name)
         opt.append('#$ -l short')  # Temp (should be a profile option)
 
         js_lines = ([SunGridEngine.SHEBANG, ''] +
@@ -315,4 +319,3 @@ class SunGridEngine(Scheduler):
                 info = {}
 
         return info
-
