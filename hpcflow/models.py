@@ -1863,6 +1863,7 @@ class CommandGroupSubmission(Base):
             'command_group_submission_id': self.id_,
             'command_group_id': self.command_group.id_,
             'commands': self.command_group.commands,
+            'name': self.command_group.name,
             'tasks': [task.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
                       for cgsub_iter in self.command_group_submission_iterations
                       for task in cgsub_iter.tasks
