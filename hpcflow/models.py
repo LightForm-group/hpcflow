@@ -1683,7 +1683,7 @@ class CommandGroupSubmission(Base):
             if is_parallel:
                 cmd_ln += 'mpirun -np $NSLOTS '
             if extract_variable_names(i, delims):
-                i = i.replace(delims[0], '${').replace(delims[1], '}')
+                i = i.replace(delims[0], '$').replace(delims[1], '')
             cmd_ln += i
             lns_cmd.append(cmd_ln)
 
