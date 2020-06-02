@@ -186,7 +186,7 @@ class Archive(Base):
 
         session = Session.object_session(self)
 
-        cg_sub = task.command_group_submission
+        cg_sub = task.command_group_submission_iteration.command_group_submission
         directory_value = task.get_working_directory()
         exclude = cg_sub.command_group.archive_excludes
         archive_dir = cg_sub.command_group.archive_directory

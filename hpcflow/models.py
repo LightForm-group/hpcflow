@@ -2139,7 +2139,7 @@ class Task(Base):
         """Get a list of other Tasks within the same command group that share the same
         working directory and iteration."""
         same_dir_tasks = []
-        for i in self.command_group_submission.tasks:
+        for i in self.command_group_submission_iteration.tasks:
             if i is self:
                 continue
             elif i.iteration == self.iteration:
