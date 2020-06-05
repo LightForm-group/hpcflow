@@ -723,26 +723,6 @@ class CommandGroup(Base):
 
         return var_defns
 
-    @property
-    def cmd_var_names(self):
-        """Get those variables definitions whose names appear directly in
-        the commands.
-
-        This excludes variable definitions that are "sub-variables".
-
-        TODO: delete this? This is the same as self.variable_names but this
-        excludes any directory variables.
-
-        """
-
-        cmd_var_names = []
-        for i in self.commands:
-            cmd_var_names.extend(
-                extract_variable_names(i, CONFIG.get('variable_delimiters'))
-            )
-
-        return cmd_var_names
-
 
 class VarDefinition(Base):
     """Class to represent a variable definition."""
