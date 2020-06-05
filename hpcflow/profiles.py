@@ -158,6 +158,11 @@ def prepare_workflow_dict(*profile_dicts):
                 'error_dir': cmd_group.pop('error_dir'),
             }
 
+            # If env is a string, split by newlines:
+            env = cmd_group.get('environment')
+            if isinstance(env, str):
+                cmd_group['environment'] = env.splitlines()
+
             profile_cmd_groups.append(cmd_group)
 
             resolve_archives(cmd_group, archives)
