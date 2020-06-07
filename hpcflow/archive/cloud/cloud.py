@@ -20,16 +20,10 @@ class CloudProvider(enum.Enum):
     null = ''
 
     def check_access(self):
-
-        print('hpcflow.archive.cloud.CloudProvider.check_access', flush=True)
-
         if self.name == 'dropbox':
             dropbox.check_access()
 
     def archive_directory(self, local_path, remote_path, exclude):
-
-        print('hpcflow.archive.cloud.CloudProvider.archive_directory', flush=True)
-
         if self.name == 'dropbox':
             dropbox.archive_directory(
                 dropbox.get_dropbox(), local_path, remote_path, exclude)
@@ -43,9 +37,6 @@ class CloudProvider(enum.Enum):
 
     def check_exists(self, directory):
         'Check a given directory exists on the cloud storage.'
-
-        print('hpcflow.archive.cloud.CloudProvider.check_exists', flush=True)
-
         if self.name == 'dropbox':
             directory = dropbox.normalise_path(directory)
             dbx = dropbox.get_dropbox()

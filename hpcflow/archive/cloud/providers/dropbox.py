@@ -19,9 +19,6 @@ from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsErr
 
 
 def get_dropbox():
-
-    print('hpcflow.archive.cloud.providers.dropbox.get_dropbox', flush=True)
-
     env_var_name = 'DROPBOX_TOKEN'
     token = Config.get('dropbox_token') or os.getenv(env_var_name)
     if not token:
@@ -35,8 +32,6 @@ def get_dropbox():
 
 
 def check_access():
-
-    print('hpcflow.archive.cloud.providers.dropbox.check_access', flush=True)
     dbx = get_dropbox()
     try:
         user_acc = dbx.users_get_current_account()

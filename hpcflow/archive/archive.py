@@ -118,7 +118,7 @@ class Archive(Base):
 
     def check_exists(self, directory):
         'Check if a given directory exists on the Archive.'
-        print('hpcflow.archive.archive.Archive.check_exists', flush=True)
+
         if not self.host:
             if self.cloud_provider != CloudProvider.null:
                 exists = self.cloud_provider.check_exists(directory)
