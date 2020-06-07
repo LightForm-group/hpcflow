@@ -12,6 +12,7 @@ import json
 
 from beautifultable import BeautifulTable
 
+from hpcflow.config import Config
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, Submission, CommandGroupSubmission
 from hpcflow.profiles import parse_job_profiles, prepare_workflow_dict
@@ -430,3 +431,7 @@ def kill(dir_path=None, workflow_id=None, config_dir=None):
 
     session.commit()
     session.close()
+
+
+def update_config(name, value, config_dir=None):
+    Config.update(name, value, config_dir=config_dir)

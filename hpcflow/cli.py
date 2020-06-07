@@ -362,6 +362,14 @@ def submit(directory=None, workflow_id=None, task_ranges=None, profiles=None,
           'ID {}'.format(workflow_id, submission_id))
 
 
+@cli.command()
+@click.option('--name', '-n', required=True)
+@click.option('--value', '-v', required=True)
+@click.option('--config-dir', type=click.Path(exists=True))
+def update_config(name, value, config_dir=None):
+    api.update_config(name, value, config_dir=config_dir)
+
+
 @cli.group()
 def dummy():
     'Dummy commands for testing/documentation.'
