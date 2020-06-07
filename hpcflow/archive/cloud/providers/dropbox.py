@@ -13,20 +13,20 @@ from datetime import datetime
 
 import dropbox as dropbox_api
 
+from hpcflow.config import Config
 from hpcflow.archive.errors import ArchiveError
-from hpcflow.archive.cloud.errors import (CloudProviderError,
-                                          CloudCredentialsError)
+from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 
 
 def get_dropbox():
 
     print('hpcflow.archive.cloud.providers.dropbox.get_dropbox', flush=True)
 
-    env_var_name = 'HPCFLOW_CLOUD_TOKEN_DROPBOX'
-    token = os.getenv(env_var_name)
+    env_var_name = 'DROPBOX_TOKEN'
+    token = Config.get('dropbox_token') or os.getenv(env_var_name)
     if not token:
-        msg = ('Please set the Dropbox access token in an environment variable'
-               ' called `{}`.'.format(env_var_name))
+        msg = ('Please set the Dropbox access token in an environment variable '
+               f'"{env_var_name}", or in the config file as "dropbox_token".')
         raise CloudCredentialsError(msg)
 
     dbx = dropbox_api.Dropbox(token)
