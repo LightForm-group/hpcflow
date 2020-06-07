@@ -1679,8 +1679,8 @@ class CommandGroupSubmission(Base):
                     if para_command:
                         cmd_ln += para_command.replace('<<num_cores>>', num_cores) + ' '
                 line = i['line']
-                if extract_variable_names(line, delims):
-                    line = line.replace(delims[0], '$').replace(delims[1], '')
+                for var_name in extract_variable_names(line, delims):
+                    line = line.replace(delims[0] + var_name + delims[1], f'${var_name}')
                 cmd_ln += line
                 lns_cmd.append(cmd_ln)
             elif 'subshell' in i:
