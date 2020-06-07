@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from warnings import warn
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, safe_load
 
 from hpcflow.errors import ConfigurationError
 
@@ -16,6 +16,7 @@ class Config(object):
     ]
     __PROFILE_KEYS_GOOD = __PROFILE_KEYS_REQ + [
         'alternate_scratch',
+        'archive_locations',
         'archive',
         'archive_excludes',
         'directory',
@@ -93,7 +94,8 @@ class Config(object):
         'default_output_dir': 'output',
         'default_error_dir': 'output',
         'hpcflow_directory': '.hpcflow',
-        'archives': [],
+        'archive_locations': {},
+        'dropbox_token': None
     }
 
     __conf = {}
@@ -101,10 +103,7 @@ class Config(object):
     is_set = False
 
     @staticmethod
-    def set_config(config_dir=None):
-        'Load configuration from a YAML file.'
-
-        # TODO: checks on config vals; e.g. format of `profile_filename_fmt`?
+    def resolve_config_dir(config_dir=None):
 
         if not config_dir:
             config_dir = Path(os.getenv('HPCFLOW_CONFIG_DIR', '~/.hpcflow')).expanduser()
@@ -115,26 +114,51 @@ class Config(object):
             if config_dir != Config.get('config_dir'):
                 warn(f'Config is already set, but `config_dir` changed from '
                      f'"{Config.get("config_dir")}" to "{config_dir}".')
-            return
 
         if not config_dir.is_dir():
             print('Configuration directory does not exist. Generating.')
             config_dir.mkdir()
 
+        return config_dir
+
+    @staticmethod
+    def get_config_file(config_dir, round_trip_load=False, quiet=False):
+
         config_file = config_dir.joinpath('config.yml')
         if not config_file.is_file():
-            print('No config.yml found. Generating an empty config.yml file.')
+            if not quiet:
+                print('No config.yml found. Generating a config.yml file.')
             with config_file.open('w'):
                 pass
 
-        print(f'Loading hpcflow config from {config_file}')
+        if not quiet:
+            print(f'Loading hpcflow config from {config_file}.')
+        if round_trip_load:
+            yaml = YAML(typ='rt')
+        else:
+            yaml = YAML(typ='safe')
+        with config_file.open() as handle:
+            config_dat = yaml.load(handle) or {}
 
-        yaml = YAML()
-        config_dat = yaml.load(config_file) or {}
         bad_keys = list(set(config_dat.keys()) - set(Config.__ALLOWED.keys()))
         if bad_keys:
             bad_keys_fmt = ', '.join([f'"{i}"' for i in bad_keys])
             raise ConfigurationError(f'Unknown configuration options: {bad_keys_fmt}.')
+
+        return config_dat, config_file
+
+    @staticmethod
+    def set_config(config_dir=None, raise_on_set=False):
+        'Load configuration from a YAML file.'
+
+        config_dir = Config.resolve_config_dir(config_dir)
+
+        if Config.is_set:
+            if raise_on_set:
+                raise ConfigurationError('Configuration is already set.')
+            return
+
+        config_dat, _ = Config.get_config_file(config_dir)
 
         profiles_dir = config_dir.joinpath('profiles')
         if not profiles_dir.is_dir():
@@ -146,6 +170,7 @@ class Config(object):
             print('Projects database directory does not exist. Generating.')
             projects_DB_dir.mkdir()
 
+        yaml = YAML()
         var_look_file = config_dir.joinpath('variable_lookup.yml')
         if not var_look_file.is_file():
             print('No variable lookup file found. Generating.')
@@ -182,3 +207,25 @@ class Config(object):
         if not Config.is_set:
             raise ConfigurationError('Configuration is not yet set.')
         return Config.__conf[name]
+
+    @staticmethod
+    def write_config_file(config_dat, config_file):
+        yaml = YAML(typ='rt')
+        yaml.dump(config_dat, config_file)
+
+    @staticmethod
+    def update(name, value, config_dir=None):
+        'Update the config file.'
+        if name not in Config.__ALLOWED:
+            msg = f'Cannot update configuration; value "{name}" is not allowed.'
+            raise ConfigurationError(msg)
+        config_dir = Config.resolve_config_dir(config_dir)
+        config_dat, config_file = Config.get_config_file(
+            config_dir,
+            round_trip_load=True,
+            quiet=True,
+        )
+        config_dat.update({name: value})
+        Config.write_config_file(config_dat, config_file)
+        if Config.is_set:
+            Config.__conf[name] = value

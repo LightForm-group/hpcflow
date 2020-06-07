@@ -35,11 +35,11 @@ def resolve_root_archive(root_archive_name, archives):
     """
 
     try:
-        arch_defn = CONFIG.get('archives')[root_archive_name]
+        arch_defn = CONFIG.get('archive_locations')[root_archive_name]
     except KeyError:
         msg = ('An archive called "{}" was not found in the '
                'configuration file. Available archives are: {}')
-        raise ValueError(msg.format(root_archive_name, CONFIG.get('archives')))
+        raise ValueError(msg.format(root_archive_name, CONFIG.get('archive_locations')))
 
     existing_idx = None
     for k_idx, k in enumerate(archives):
@@ -59,18 +59,21 @@ def resolve_root_archive(root_archive_name, archives):
     return arch_idx
 
 
-def resolve_archives(cmd_group, archives):
+def resolve_archives(cmd_group, archives, profile_archives):
     """Resolve archive definition from the config file and add to the archives
     list"""
 
     arch_name = cmd_group.pop('archive', None)
     if arch_name:
         try:
-            arch_defn = CONFIG.get('archives')[arch_name]
+            arch_defn = {
+                **CONFIG.get('archive_locations'),
+                **(profile_archives or {}),
+            }[arch_name]
         except KeyError:
             msg = ('An archive called "{}" was not found in the '
                    'configuration file. Available archives are: {}')
-            raise ValueError(msg.format(arch_name, CONFIG.get('archives')))
+            raise ValueError(msg.format(arch_name, CONFIG.get('archive_locations')))
 
         existing_idx = None
         for k_idx, k in enumerate(archives):
@@ -210,7 +213,8 @@ def prepare_workflow_dict(*profile_dicts):
             cmd_group['commands'] = normalise_commands(cmd_group['commands'])
 
             profile_cmd_groups.append(cmd_group)
-            resolve_archives(cmd_group, archives)
+
+            resolve_archives(cmd_group, archives, i.get('archive_locations'))
 
         command_groups.extend(profile_cmd_groups)
 
