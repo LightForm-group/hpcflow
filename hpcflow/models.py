@@ -1875,8 +1875,6 @@ class CommandGroupSubmission(Base):
 
     def get_stats(self, jsonable=True, datetime_dicts=False):
         'Get task statistics for this command group submission.'
-        print('CGS.get_stats: self.command_group_submission_iterations: {}'.format(
-            self.command_group_submission_iterations))
         out = {
             'command_group_submission_id': self.id_,
             'command_group_id': self.command_group.id_,
