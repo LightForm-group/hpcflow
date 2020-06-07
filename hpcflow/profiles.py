@@ -21,6 +21,7 @@ from hpcflow.variables import (
     get_variabled_filename_regex,
     find_variabled_filenames,
 )
+from hpcflow.models import CommandGroup
 
 
 def resolve_root_archive(root_archive_name, archives):
@@ -90,6 +91,45 @@ def resolve_archives(cmd_group, archives):
         cmd_group.pop('archive_excludes', None)
 
 
+def normalise_commands(commands):
+    'Normalise command group commands to a list of dicts.'
+
+    if isinstance(commands, str):
+        commands = [{'line': i} for i in commands.splitlines()]
+
+    if not isinstance(commands, list):
+        msg = '`commands` must be a (optionally multiline) string or a list of dict.'
+        raise ValueError(msg)
+
+    for cmd_idx, cmd in enumerate(commands):
+        if not isinstance(cmd, dict):
+            msg = 'Each element in `commands` must be dict.'
+            raise ValueError(msg)
+
+        ALLOWED = ['line', 'parallel_mode', 'subshell']
+        ALLOWED_fmt = ', '.join([f'{i!r}' for i in ALLOWED])
+        bad_keys = set(cmd.keys()) - set(ALLOWED)
+        if bad_keys:
+            bad_keys_fmt = ', '.join([f'{i!r}' for i in bad_keys])
+            msg = (f'Each element in `commands` must be a dict with allowed keys: '
+                   f'{ALLOWED_fmt}. Unknown keys specified: {bad_keys_fmt}.')
+            raise ValueError(msg)
+
+        if 'subshell' in cmd:
+            if ('line' or 'parallel_mode') in cmd:
+                msg = (f'If `subshell` is specified in a `commands` list element, no '
+                       f'other keys are permitted in the list element.')
+                raise ValueError(msg)
+            commands[cmd_idx]['subshell'] = normalise_commands(cmd['subshell'])
+
+        elif 'line' in cmd:
+            if not cmd['line']:
+                raise ValueError(f'The `line` key in each element in `commands` must be '
+                                 f'non-null.')
+
+    return commands
+
+
 def prepare_workflow_dict(*profile_dicts):
     'Prepare the workflow dict for initialisation as a Workflow object.'
 
@@ -102,6 +142,7 @@ def prepare_workflow_dict(*profile_dicts):
     archives = []
     root_arch_name = None
     loop = None
+    parallel_modes = None
     root_arch_exc = []
     root_arch_num = 0
     profile_files = []
@@ -125,6 +166,8 @@ def prepare_workflow_dict(*profile_dicts):
 
         if 'loop' in i:
             loop = i['loop']
+        if 'parallel_modes' in i:
+            parallel_modes = i['parallel_modes']
 
         profile_cmd_groups = []
         # Form command group list:
@@ -158,13 +201,15 @@ def prepare_workflow_dict(*profile_dicts):
                 'error_dir': cmd_group.pop('error_dir'),
             }
 
-            # If env is a string, split by newlines:
+            # Normalise env: if env is a string, split by newlines:
             env = cmd_group.get('environment')
             if isinstance(env, str):
                 cmd_group['environment'] = env.splitlines()
 
-            profile_cmd_groups.append(cmd_group)
+            # Normalise commands:
+            cmd_group['commands'] = normalise_commands(cmd_group['commands'])
 
+            profile_cmd_groups.append(cmd_group)
             resolve_archives(cmd_group, archives)
 
         command_groups.extend(profile_cmd_groups)
@@ -178,7 +223,7 @@ def prepare_workflow_dict(*profile_dicts):
 
             cmd_group_var_defns = select_cmd_group_var_definitions(
                 var_defns_all,
-                j['commands'],
+                CommandGroup.get_command_lines(j['commands']),
                 j['directory']
             )
 
@@ -199,6 +244,7 @@ def prepare_workflow_dict(*profile_dicts):
         'root_archive_idx': root_arch_idx,
         'root_archive_excludes': root_arch_exc,
         'profile_files': profile_files,
+        'parallel_modes': parallel_modes,
     }
 
     if loop:

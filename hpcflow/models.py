@@ -56,6 +56,7 @@ class Workflow(Base):
     root_archive_directory = Column(String(255), nullable=True)
     _profile_files = Column('profile_files', JSON, nullable=True)
     loop = Column(JSON)
+    parallel_modes = Column(JSON, nullable=True)
 
     command_groups = relationship(
         'CommandGroup',
@@ -70,7 +71,8 @@ class Workflow(Base):
 
     def __init__(self, directory, command_groups, var_definitions=None,
                  pre_commands=None, archives=None, root_archive_idx=None,
-                 root_archive_excludes=None, profile_files=None, loop=None):
+                 root_archive_excludes=None, profile_files=None, loop=None,
+                 parallel_modes=None):
         """Method to initialise a new Workflow.
 
         Parameters
@@ -109,7 +111,14 @@ class Workflow(Base):
                 groups : list of int, optional
                     Which command groups to include in iterations beyond the first. If not
                     specified, all command groups are included in the loop.
-
+        parallel_modes : dict, optional
+            If specified, (case-insensitive) keys are one or more of: 'MPI', 'OpenMP'.
+            Each is a dict with allowed keys:
+                env : list of str
+                    Environment set up required for a given parallel mode.
+                command : str
+                    Command to prepend to any command group commands that use this
+                    parallel mode.
 
         """
 
@@ -194,6 +203,7 @@ class Workflow(Base):
             cmd_groups.append(CommandGroup(**i))
 
         self.command_groups = cmd_groups
+        self.parallel_modes = parallel_modes
 
         self.loop = loop
         for i in range(self.loop['max_iterations']):
@@ -547,8 +557,8 @@ class CommandGroup(Base):
 
         Parameters
         ----------
-        commands : list of str
-            List of commands to sequentially execute.
+        commands : list of dict
+            List of dicts containing commands to execute.
         directory_var : VarDefinition
             The working directory for this command group. TODO...
         is_job_array : bool, optional
@@ -629,12 +639,6 @@ class CommandGroup(Base):
             msg = 'At least one command must be specified.'
             raise ValueError(msg)
 
-        # Check non-empty commands exist:
-        for cmd_idx, cmd in enumerate(self.commands):
-            if not cmd:
-                msg = 'Command #{} is empty; a command must be specified.'
-                raise ValueError(msg.format(cmd_idx))
-
         self.nesting = NestingType[self.nesting] if self.nesting else None
 
         # Check alternate scratch exists
@@ -642,6 +646,17 @@ class CommandGroup(Base):
             if not self.alternate_scratch.is_dir():
                 msg = 'Alternate scratch "{}" is not an existing directory.'
                 raise ValueError(msg.format(self.alternate_scratch))
+
+    @staticmethod
+    def get_command_lines(commands):
+        'Get all lines in the commands list.'
+        out = []
+        for i in commands:
+            if 'line' in i:
+                out.append(i['line'])
+            elif 'subshell' in i:
+                out.extend(CommandGroup.get_command_lines(i['subshell']))
+        return out
 
     @property
     def scheduler(self):
@@ -679,7 +694,9 @@ class CommandGroup(Base):
         """Get those variable names associated with this command group."""
 
         var_names = select_cmd_group_var_names(
-            self.commands, self.directory_variable.value)
+            self.get_command_lines(self.commands),
+            self.directory_variable.value
+        )
         return var_names
 
     @property
@@ -712,7 +729,7 @@ class CommandGroup(Base):
 
         cmd_group_var_defns = select_cmd_group_var_definitions(
             var_defns_dict,
-            self.commands,
+            self.get_command_lines(self.commands),
             self.directory_variable.value,
         )
 
@@ -1645,31 +1662,49 @@ class CommandGroupSubmission(Base):
                 for i in var_val_all:
                     handle.write('{}\n'.format(i))
 
-    def write_command_file(self, project):
+    @staticmethod
+    def get_formatted_commands(commands, num_cores, parallel_modes, indent=''):
 
-        lns_while_start = [
-            'while true',
-            'do'
-        ]
-
+        # TODO: what about parallel mode env?
         delims = CONFIG.get('variable_delimiters')
         lns_cmd = []
-        for i in self.command_group.commands:
-            if self.command_group.variable_definitions:
-                cmd_ln = '\t'
-            else:
-                cmd_ln = ''
-            is_parallel = 'pe' in self.command_group.scheduler.options
-            if is_parallel:
-                cmd_ln += 'mpirun -np $NSLOTS '
-            if extract_variable_names(i, delims):
-                i = i.replace(delims[0], '$').replace(delims[1], '')
-            cmd_ln += i
-            lns_cmd.append(cmd_ln)
+        for i in commands:
+            if 'line' in i:
+                cmd_ln = indent
+                para_mode = i.get('parallel_mode')
+                if para_mode:
+                    para_mode_config = parallel_modes.get(
+                        para_mode.lower())  # todo raise on miss
+                    para_command = para_mode_config.get('command')
+                    if para_command:
+                        cmd_ln += para_command.replace('<<num_cores>>', num_cores) + ' '
+                line = i['line']
+                if extract_variable_names(line, delims):
+                    line = line.replace(delims[0], '$').replace(delims[1], '')
+                cmd_ln += line
+                lns_cmd.append(cmd_ln)
+            elif 'subshell' in i:
+                sub_cmds = CommandGroupSubmission.get_formatted_commands(
+                    i['subshell'],
+                    num_cores,
+                    parallel_modes,
+                    indent=(indent+'\t'),
+                )
+                lns_cmd.extend([f'{indent}('] + sub_cmds + [f'{indent})'])
 
-        lns_while_end = [
-            'done \\'
-        ]
+        return lns_cmd
+
+    def write_command_file(self, project):
+
+        lns_cmd = self.get_formatted_commands(
+            self.command_group.commands,
+            num_cores=self.command_group.scheduler.NUM_CORES_VAR,
+            parallel_modes=self.command_group.workflow.parallel_modes,
+            indent=('\t' if self.command_group.variable_definitions else ''),
+        )
+
+        lns_while_start = ['while true', 'do']
+        lns_while_end = ['done \\']
 
         dt_stamp = datetime.now().strftime(r'%Y.%m.%d at %H:%M:%S')
         about_msg = ['# --- commands file generated by `hpcflow` (version: {}) '

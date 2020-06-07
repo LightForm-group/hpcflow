@@ -58,6 +58,8 @@ class SunGridEngine(Scheduler):
         'P',        # Project name (e.g. to which account jobs are accounted against)
     ]
 
+    NUM_CORES_VAR = '$NSLOTS'
+
     def __init__(self, options=None, output_dir=None, error_dir=None):
 
         for i in options:
