@@ -39,7 +39,7 @@ def check_access():
         msg = 'Could not connect to Dropbox using the supplied access token.'
         raise ValueError(msg)
 
-    print('Successfully connected to Dropbox.', flush=True)
+    print('OK!', flush=True)
 
 
 def get_files(dbx, path):

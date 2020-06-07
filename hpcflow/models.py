@@ -291,6 +291,8 @@ class Workflow(Base):
         # If using an Archive with a cloud provider, check access:
         for i in archive_objs:
             if i.cloud_provider != CloudProvider.null:
+                msg = f'Checking access to cloud storage ({i.name})...'
+                print(msg, end='', flush=True)
                 i.cloud_provider.check_access()
 
     def add_submission(self, project, task_range=None):
