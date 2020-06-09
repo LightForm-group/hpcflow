@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.9] - 2020.06.09
+
+### Changed
+
+- Improved Dropbox authorization flow.
+
 ## [0.1.8] - 2020.06.09
 
 ### Changed
