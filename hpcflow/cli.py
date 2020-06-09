@@ -370,6 +370,13 @@ def update_config(name, value, config_dir=None):
     api.update_config(name, value, config_dir=config_dir)
 
 
+@cli.command()
+@click.option('--provider', '-p', required=True)
+@click.option('--config-dir', type=click.Path(exists=True))
+def cloud_connect(provider, config_dir=None):
+    api.cloud_connect(provider, config_dir=config_dir)
+
+
 @cli.group()
 def dummy():
     'Dummy commands for testing/documentation.'

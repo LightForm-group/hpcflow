@@ -17,6 +17,7 @@ from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, Submission, CommandGroupSubmission
 from hpcflow.profiles import parse_job_profiles, prepare_workflow_dict
 from hpcflow.project import Project
+from hpcflow.archive.cloud.cloud import CloudProvider
 
 
 def make_workflow(dir_path=None, profile_list=None, json_file=None, json_str=None,
@@ -435,3 +436,23 @@ def kill(dir_path=None, workflow_id=None, config_dir=None):
 
 def update_config(name, value, config_dir=None):
     Config.update(name, value, config_dir=config_dir)
+
+
+def cloud_connect(provider, config_dir=None):
+    Config.set_config(config_dir)
+    token_key = {'dropbox': 'dropbox_token'}[provider.lower()]
+    provider = {'dropbox': CloudProvider.dropbox}[provider.lower()]
+    token = Config.get(token_key)
+    good = False
+    if token:
+        try:
+            provider.check_access()
+            print('Connected to cloud provider.')
+            good = True
+        except:
+            print('Existing cloud provider key does not work.')
+            pass
+    if not good:
+        print('Getting new cloud token.')
+        token = provider.get_token()
+        update_config(token_key, token, config_dir=config_dir)

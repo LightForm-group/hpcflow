@@ -41,3 +41,7 @@ class CloudProvider(enum.Enum):
             directory = dropbox.normalise_path(directory)
             dbx = dropbox.get_dropbox()
             return dropbox.is_folder(dbx, directory)
+
+    def get_token(self):
+        if self.name == 'dropbox':
+            return dropbox.get_token()

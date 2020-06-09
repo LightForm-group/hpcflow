@@ -79,6 +79,7 @@ class Config(object):
         'cmd_group_keys_required': __CMD_GROUP_KEYS_REQ,
         'cmd_group_keys_allowed': __CMD_GROUP_KEYS_GOOD,
         'cmd_group_defaults': __CMD_GROUP_DEFAULTS,
+        'dropbox_app_key': 'g2zt0hmhfjavd2d',
     }
 
     # These may be customised in the config file:

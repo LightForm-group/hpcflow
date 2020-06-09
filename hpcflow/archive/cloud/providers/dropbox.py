@@ -10,12 +10,44 @@ import fnmatch
 from pathlib import Path
 from pprint import pprint
 from datetime import datetime
+from textwrap import dedent
 
 import dropbox as dropbox_api
 
 from hpcflow.config import Config
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
+
+
+def get_token():
+
+    APP_KEY = Config.get('dropbox_app_key')
+    auth_flow = dropbox_api.DropboxOAuth2FlowNoRedirect(APP_KEY, use_pkce=True)
+    authorize_url = auth_flow.start()
+
+    msg = dedent(f"""
+    --------------------------- Connecting hpcflow to Dropbox ----------------------------
+
+        1. Go to this URL:
+
+        {authorize_url}
+
+        2. Click "Allow" (you might have to log in first).
+        3. Copy the authorization code below.
+
+    --------------------------------------------------------------------------------------
+    """)
+    print(msg)
+
+    auth_code = input('Enter the authorization code here: ').strip()
+    try:
+        oauth_result = auth_flow.finish(auth_code)
+    except Exception as err:
+        print(f'Error: {err}')
+
+    token = oauth_result.access_token
+
+    return token
 
 
 def get_dropbox():
