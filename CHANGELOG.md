@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.8] - 2020.06.09
+
+### Changed
+
+- Latest dev branch merge
+
 ## [0.1.7] - 2020.05.12
 
 ### Changed
