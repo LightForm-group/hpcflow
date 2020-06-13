@@ -7,7 +7,7 @@ construct a Workflow.
 
 from pathlib import Path
 
-import yaml
+from ruamel import yaml
 
 from hpcflow.config import Config as CONFIG
 from hpcflow.validation import (
