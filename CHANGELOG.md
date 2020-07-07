@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.1.10] - 2020.07.07
+
+### Fixed
+
+- Use correct YAML library in `profiles.py`
+- Fix alternate scratch
+- Allow using the same alternate scratch in different command groups
+
 ## [0.1.9] - 2020.06.09
 
 ### Changed
