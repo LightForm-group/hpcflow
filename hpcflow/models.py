@@ -264,7 +264,9 @@ class Workflow(Base):
 
     @property
     def all_alternate_scratch(self):
-        return [i.alternate_scratch for i in self.command_groups if i.alternate_scratch]
+        out = list(set([i.alternate_scratch for i in self.command_groups
+                        if i.alternate_scratch]))
+        return out
 
     @property
     def directory(self):
@@ -1829,7 +1831,7 @@ class CommandGroupSubmission(Base):
                 # Already made "root" dir.
                 continue
             alt_scratch_w_dir = alt_scratch_root.joinpath(working_dir.value)
-            alt_scratch_w_dir.mkdir(parents=True, exist_ok=False)
+            alt_scratch_w_dir.mkdir(parents=True, exist_ok=True)
 
     def get_iteration(self, iter_idx):
         for i in self.submission.workflow.iterations:
