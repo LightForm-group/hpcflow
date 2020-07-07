@@ -1818,8 +1818,8 @@ class CommandGroupSubmission(Base):
         'Generate task working directories on the alternate scratch.'
 
         # Get task working directories:
-        working_dirs = [task.get_working_directory()
-                        for task in self.tasks if task.iteration == iteration]
+        cg_sub_iter = self.get_command_group_submission_iteration(iteration)
+        working_dirs = [task.get_working_directory() for task in cg_sub_iter.tasks]
 
         alt_scratch_root = self.command_group.alternate_scratch.joinpath(
             self.submission.alt_scratch_dir_name)
