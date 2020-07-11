@@ -23,6 +23,7 @@ class Config(object):
         'inherits',
         'is_job_array',
         'loop',
+        'parallel_modes',
         'environment',
         'nesting',
         'scheduler',
