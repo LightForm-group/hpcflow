@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.1.11] - 2020.08.25
+
+### Fixed
+
+- Add missing allowed profile key `parallel_modes`, whose absence was resulting in failure when submitting from a profile file.
+- Fix iterations.
+
 ## [0.1.10] - 2020.07.07
 
 ### Fixed
