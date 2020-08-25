@@ -125,6 +125,7 @@ class Workflow(Base):
         if loop is None:
             loop = {
                 'max_iterations': 1,
+                'groups': [],
             }
 
         # Command group directories must be stored internally as variables:
@@ -984,6 +985,7 @@ class Submission(Base):
                 cg_sub_iter = CommandGroupSubmissionIteration(iteration, cg_sub)
                 cg_sub_iters.append(cg_sub_iter)
 
+        session.commit()
         # `cg_sub_iter.num_outputs` requires all cg_sub_iters to be generated:
         for cg_sub_iter in cg_sub_iters:
             for task_num in range(cg_sub_iter.num_outputs):
@@ -1228,6 +1230,7 @@ class Submission(Base):
         submit_path = wf_path.joinpath('submit_{}'.format(self.order_id))
         submit_path.mkdir()
 
+        num_dir_vals_first_iter = {}  # keys are cg_sub_idx
         for iteration in self.workflow.iterations:
 
             # Make the iteration directory for each iteration:
@@ -1247,8 +1250,13 @@ class Submission(Base):
                 for cg_sub_idx, cg_sub in enumerate(i.command_group_submissions):
 
                     cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+                    if not cg_sub_iter:
+                        continue
 
-                    num_dir_vals = cg_sub_iter.num_directories
+                    cg_sub_first_iter = cg_sub.get_command_group_submission_iteration(
+                        self.first_iteration
+                    )
+                    num_dir_vals = cg_sub_first_iter.num_directories
                     all_dir_slots = [''] * max_num_tasks
 
                     # Distribute dirs over num_dir_slots:
@@ -1287,51 +1295,69 @@ class Submission(Base):
 
     def submit_jobscripts(self, jobscript_paths):
 
-        js_paths, js_stat_paths = jobscript_paths
+        loop_groups = self.workflow.loop['groups']
+        cmd_group_idx = range(len(self.workflow.command_groups))
+
+        if loop_groups:
+
+            pre_loop_idx = [i for i in cmd_group_idx if i < min(loop_groups)]
+            post_loop_idx = [i for i in cmd_group_idx if i > max(loop_groups)]
+
+            # List of tuples mapping jobscript path index (i.e. command group order id) to
+            # iteration index:
+            js_submissions = [(i, 0) for i in pre_loop_idx]
+
+            for iteration in self.workflow.iterations:
+                for i in loop_groups:
+                    js_submissions.append((i, iteration.order_id))
+
+            for i in post_loop_idx:
+                js_submissions.append((i, 0))
+
+        else:
+            js_submissions = [(i, 0) for i in cmd_group_idx]
 
         sumbit_cmd = os.getenv('HPCFLOW_QSUB_CMD', 'qsub')
         last_submit_id = None
-        for iteration in self.workflow.iterations:
+        js_paths, js_stat_paths = jobscript_paths
 
-            iter_idx_var = 'ITER_IDX={}'.format(iteration.order_id)
+        for cg_sub_idx, iter_idx in js_submissions:
 
-            for js_path_i, js_stat_path_i, cg_sub in zip(
-                    js_paths, js_stat_paths, self.command_group_submissions):
+            iter_idx_var = 'ITER_IDX={}'.format(iter_idx)
+            cg_sub = self.command_group_submissions[cg_sub_idx]
+            iteration = self.workflow.iterations[iter_idx]
+            cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
+            js_path_i, js_stat_path_i = js_paths[cg_sub_idx], js_stat_paths[cg_sub_idx]
 
-                cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
-                if cg_sub_iter is None:
-                    continue
+            qsub_cmd = [sumbit_cmd]
 
-                qsub_cmd = [sumbit_cmd]
+            if last_submit_id:
 
-                if last_submit_id:
+                # Add conditional submission:
+                if iteration.order_id > 0:
+                    hold_arg = '-hold_jid'
+                elif cg_sub.command_group.nesting == NestingType('hold'):
+                    hold_arg = '-hold_jid'
+                else:
+                    hold_arg = '-hold_jid_ad'
 
-                    # Add conditional submission:
-                    if iteration.order_id > 0:
-                        hold_arg = '-hold_jid'
-                    elif cg_sub.command_group.nesting == NestingType('hold'):
-                        hold_arg = '-hold_jid'
-                    else:
-                        hold_arg = '-hold_jid_ad'
+                qsub_cmd += [hold_arg, last_submit_id]
 
-                    qsub_cmd += [hold_arg, last_submit_id]
+            qsub_cmd += ['-v', iter_idx_var]
+            qsub_cmd.append(str(js_path_i))
 
-                qsub_cmd += ['-v', iter_idx_var]
-                qsub_cmd.append(str(js_path_i))
+            # Submit the jobscript:
+            job_id_str = self.submit_jobscript(qsub_cmd, js_path_i, iteration)
+            cg_sub_iter.scheduler_job_id = int(job_id_str)
+            last_submit_id = job_id_str
 
-                # Submit the jobscript:
-                job_id_str = self.submit_jobscript(qsub_cmd, js_path_i, iteration)
-                cg_sub_iter.scheduler_job_id = int(job_id_str)
+            # Submit the stats jobscript:
+            if js_stat_path_i:
+                st_cmd = [sumbit_cmd, '-hold_jid_ad', last_submit_id, '-v', iter_idx_var]
+                st_cmd.append(str(js_stat_path_i))
+
+                job_id_str = self.submit_jobscript(st_cmd, js_stat_path_i, iteration)
                 last_submit_id = job_id_str
-
-                # Submit the stats jobscript:
-                if js_stat_path_i:
-                    st_cmd = [sumbit_cmd, '-hold_jid_ad',
-                              last_submit_id, '-v', iter_idx_var]
-                    st_cmd.append(str(js_stat_path_i))
-
-                    job_id_str = self.submit_jobscript(st_cmd, js_stat_path_i, iteration)
-                    last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
 
@@ -1485,8 +1511,9 @@ class CommandGroupSubmission(Base):
         return self.submission.get_scheduler_group(self)
 
     def get_command_group_submission_iteration(self, iteration):
-        for i in iteration.command_group_submission_iterations:
-            if i.command_group_submission == self:
+
+        for i in self.command_group_submission_iterations:
+            if i.iteration == iteration:
                 return i
 
     @property
@@ -2275,11 +2302,13 @@ class Iteration(Base):
     def __repr__(self):
         out = (
             '{}('
+            'id={}, '
             'workflow_id={}, '
             'order_id={}'
             ')'
         ).format(
             self.__class__.__name__,
+            self.id_,
             self.workflow_id,
             self.order_id,
         )
@@ -2394,13 +2423,15 @@ class CommandGroupSubmissionIteration(Base):
     @property
     def num_outputs(self):
         'Get the number of outputs for this command group submission.'
-        return self.command_group_submission.scheduler_group.get_num_outputs(self.iteration)[
+        iteration = self.command_group_submission.submission.workflow.first_iteration
+        return self.command_group_submission.scheduler_group.get_num_outputs(iteration)[
             self.command_group_submission.scheduler_group_index[1]]
 
     @property
     def step_size(self):
         'Get the scheduler step size for this command group submission.'
-        return self.command_group_submission.scheduler_group.get_step_size(self.iteration)[
+        iteration = self.command_group_submission.submission.workflow.first_iteration
+        return self.command_group_submission.scheduler_group.get_step_size(iteration)[
             self.command_group_submission.scheduler_group_index[1]]
 
     @property
