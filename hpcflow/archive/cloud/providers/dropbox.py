@@ -40,11 +40,7 @@ def get_token():
     print(msg)
 
     auth_code = input('Enter the authorization code here: ').strip()
-    try:
-        oauth_result = auth_flow.finish(auth_code)
-    except Exception as err:
-        print(f'Error: {err}')
-
+    oauth_result = auth_flow.finish(auth_code)
     token = oauth_result.access_token
 
     return token
