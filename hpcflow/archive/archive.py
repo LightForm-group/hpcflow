@@ -117,7 +117,7 @@ class Archive(Base):
         return directories
 
     def check_exists(self, directory):
-        'Check if a given directory exists on the Archive.'
+        """Check if a given directory exists on the Archive."""
 
         if not self.host:
             if self.cloud_provider != CloudProvider.null:
@@ -130,7 +130,7 @@ class Archive(Base):
         return exists
 
     def get_archive_dir(self, workflow):
-        'This should be called once per unique workflow Archive.'
+        """This should be called once per unique workflow Archive."""
 
         if self.root_directory_name != RootDirectoryName.null:
 

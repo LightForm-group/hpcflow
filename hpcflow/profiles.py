@@ -95,7 +95,7 @@ def resolve_archives(cmd_group, archives, profile_archives):
 
 
 def normalise_commands(commands):
-    'Normalise command group commands to a list of dicts.'
+    """Normalise command group commands to a list of dicts."""
 
     if isinstance(commands, str):
         commands = [{'line': i} for i in commands.splitlines()]
@@ -134,7 +134,7 @@ def normalise_commands(commands):
 
 
 def prepare_workflow_dict(*profile_dicts):
-    'Prepare the workflow dict for initialisation as a Workflow object.'
+    """Prepare the workflow dict for initialisation as a Workflow object."""
 
     # Form command group list, where profile-level parameters are copied to the
     # child command groups, but equivalent command group parameters take

@@ -117,7 +117,7 @@ def download_dropbox_file(dbx, dropbox_path, local_path):
 
 
 def normalise_path(path):
-    'Modify a path (str or Path) such that it is a Dropbox-compatible path string.'
+    """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
     path = posixpath.join(*str(path).split(os.path.sep))
     if not path.startswith('/'):
         path = '/' + path

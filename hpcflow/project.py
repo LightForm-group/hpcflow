@@ -57,7 +57,7 @@ class Project(object):
         return self.hf_dir.joinpath(self.db_directory_name)
 
     def ensure_db_symlink(self):
-        'Add a symlink to the DB for convenience (has to be done after the DB is created)'
+        """Add a symlink to the DB for convenience (has to be done after the DB is created)"""
 
         if not self.db_dir_symlink.exists():
             target = str(self.project_db_dir)
@@ -70,7 +70,7 @@ class Project(object):
             run(cmd, shell=True)
 
     def clean(self):
-        'Remove all hpcflow related files and directories associated with this project.'
+        """Remove all hpcflow related files and directories associated with this project."""
 
         if self.hf_dir.exists():
 

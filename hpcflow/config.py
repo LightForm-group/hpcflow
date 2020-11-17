@@ -151,7 +151,7 @@ class Config(object):
 
     @staticmethod
     def set_config(config_dir=None, raise_on_set=False):
-        'Load configuration from a YAML file.'
+        """Load configuration from a YAML file."""
 
         config_dir = Config.resolve_config_dir(config_dir)
 
@@ -217,7 +217,7 @@ class Config(object):
 
     @staticmethod
     def update(name, value, config_dir=None):
-        'Update the config file.'
+        """Update the config file."""
         if name not in Config.__ALLOWED:
             msg = f'Cannot update configuration; value "{name}" is not allowed.'
             raise ConfigurationError(msg)

@@ -113,12 +113,11 @@ def submit_workflow(workflow_id, dir_path=None, task_range='all', config_dir=Non
         and last tasks, inclusively, to submit. By default, the task step size is one, but
         this can be chosen as a third list entry. If a string "all", all tasks are
         submitted.
-
-    TODO: do validation of task_ranges here? so models.workflow.add_submission
-    always receives a definite `task_ranges`? What about if the number is
-    indeterminate at submission time?
-
     """
+
+    # TODO: do validation of task_ranges here? so models.workflow.add_submission
+    #   always receives a definite `task_ranges`? What about if the number is
+    #   indeterminate at submission time?
 
     if task_range == 'all' or task_range is None:
         task_range = [1, -1, 1]
@@ -303,7 +302,7 @@ def get_scheduler_stats(cmd_group_sub_id, task_idx, iter_idx, dir_path=None,
 
 def get_stats(dir_path=None, workflow_id=None, jsonable=True, datetime_dicts=False,
               config_dir=None):
-    'Get task statistics (as a JSON-like dict) for a project.'
+    """Get task statistics (as a JSON-like dict) for a project."""
 
     project = Project(dir_path, config_dir)
     Session = init_db(project, check_exists=True)
@@ -337,7 +336,7 @@ def get_stats(dir_path=None, workflow_id=None, jsonable=True, datetime_dicts=Fal
 
 def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
                         show_task_end=False, config_dir=None):
-    'Get task statistics formatted like a table.'
+    """Get task statistics formatted like a table."""
 
     stats = get_stats(dir_path, workflow_id, jsonable=True, config_dir=config_dir)
 
@@ -393,7 +392,7 @@ def get_formatted_stats(dir_path=None, workflow_id=None, max_width=100,
 
 
 def save_stats(save_path, dir_path=None, workflow_id=None, config_dir=None):
-    'Save task statistics as a JSON file.'
+    """Save task statistics as a JSON file."""
 
     stats = get_stats(dir_path, workflow_id, jsonable=True, config_dir=config_dir)
 
@@ -403,7 +402,7 @@ def save_stats(save_path, dir_path=None, workflow_id=None, config_dir=None):
 
 
 def kill(dir_path=None, workflow_id=None, config_dir=None):
-    'Delete jobscripts associated with a given workflow.'
+    """Delete jobscripts associated with a given workflow."""
 
     project = Project(dir_path, config_dir)
     Session = init_db(project, check_exists=True)
