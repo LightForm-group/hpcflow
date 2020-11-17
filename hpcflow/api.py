@@ -7,14 +7,13 @@ and includes functions that are called by the command line interface (CLI; in
 """
 
 from pathlib import Path
-from pprint import pprint
 import json
 
 from beautifultable import BeautifulTable
 
 from hpcflow.config import Config
 from hpcflow.init_db import init_db
-from hpcflow.models import Workflow, Submission, CommandGroupSubmission
+from hpcflow.models import Workflow, CommandGroupSubmission
 from hpcflow.profiles import parse_job_profiles, prepare_workflow_dict
 from hpcflow.project import Project
 from hpcflow.archive.cloud.cloud import CloudProvider

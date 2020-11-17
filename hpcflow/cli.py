@@ -6,7 +6,6 @@ Module that exposes a command line interface for `hpcflow`.
 import socket
 import os
 from pathlib import Path
-from pprint import pprint
 from datetime import datetime
 from random import randint
 

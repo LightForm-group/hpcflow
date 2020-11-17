@@ -9,11 +9,10 @@ import enum
 import time
 from datetime import datetime
 from pathlib import Path
-from pprint import pprint
 from shutil import ignore_patterns
 from time import sleep
 
-from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
+from sqlalchemy import (Table, Column, Integer, ForeignKey, String,
                         UniqueConstraint, Enum, Boolean)
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError

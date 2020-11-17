@@ -2,7 +2,6 @@
 
 import re
 from copy import deepcopy
-from pprint import pprint
 from pathlib import Path
 
 from hpcflow.config import Config as CONFIG

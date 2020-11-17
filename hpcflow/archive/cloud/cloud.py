@@ -7,8 +7,6 @@ the provider-specific `upload_file` functions.
 """
 
 import enum
-import posixpath
-import os
 
 from hpcflow.archive.cloud.providers import dropbox
 

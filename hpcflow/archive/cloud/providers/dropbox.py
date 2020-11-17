@@ -8,7 +8,6 @@ import os
 import posixpath
 import fnmatch
 from pathlib import Path
-from pprint import pprint
 from datetime import datetime
 from textwrap import dedent
 
