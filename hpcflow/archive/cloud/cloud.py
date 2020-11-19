@@ -7,8 +7,6 @@ the provider-specific `upload_file` functions.
 """
 
 import enum
-import posixpath
-import os
 
 from hpcflow.archive.cloud.providers import dropbox
 
@@ -29,14 +27,14 @@ class CloudProvider(enum.Enum):
                 dropbox.get_dropbox(), local_path, remote_path, exclude)
 
     def get_directories(self, path):
-        'Get sub directories within a path'
+        """Get sub directories within a path"""
 
         if self.name == 'dropbox':
             dbx = dropbox.get_dropbox()
             return dropbox.get_folders(dbx, path)
 
     def check_exists(self, directory):
-        'Check a given directory exists on the cloud storage.'
+        """Check a given directory exists on the cloud storage."""
         if self.name == 'dropbox':
             directory = dropbox.normalise_path(directory)
             dbx = dropbox.get_dropbox()

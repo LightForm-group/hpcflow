@@ -1,4 +1,4 @@
-from shutil import copy2, copystat, Error, ignore_patterns, copytree
+from shutil import copy2, copystat, Error
 import os
 
 

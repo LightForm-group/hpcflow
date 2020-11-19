@@ -9,11 +9,10 @@ import enum
 import time
 from datetime import datetime
 from pathlib import Path
-from pprint import pprint
 from shutil import ignore_patterns
 from time import sleep
 
-from sqlalchemy import (Table, Column, Integer, DateTime, ForeignKey, String,
+from sqlalchemy import (Table, Column, Integer, ForeignKey, String,
                         UniqueConstraint, Enum, Boolean)
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -117,7 +116,7 @@ class Archive(Base):
         return directories
 
     def check_exists(self, directory):
-        'Check if a given directory exists on the Archive.'
+        """Check if a given directory exists on the Archive."""
 
         if not self.host:
             if self.cloud_provider != CloudProvider.null:
@@ -130,7 +129,7 @@ class Archive(Base):
         return exists
 
     def get_archive_dir(self, workflow):
-        'This should be called once per unique workflow Archive.'
+        """This should be called once per unique workflow Archive."""
 
         if self.root_directory_name != RootDirectoryName.null:
 

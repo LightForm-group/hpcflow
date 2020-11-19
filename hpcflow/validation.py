@@ -8,7 +8,6 @@ constructing `Workflow` and `CommandGroup` instances.
 """
 
 from hpcflow.config import Config as CONFIG
-from hpcflow.nesting import NestingType
 
 
 def validate_workflow(workflow_dict):

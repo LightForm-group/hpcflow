@@ -476,7 +476,7 @@ class Workflow(Base):
                                       self.root_archive_directory)
 
     def get_stats(self, jsonable=True, datetime_dicts=False):
-        'Get task statistics for this workflow.'
+        """Get task statistics for this workflow."""
         out = {
             'workflow_id': self.id_,
             'submissions': [i.get_stats(jsonable=jsonable, datetime_dicts=datetime_dicts)
@@ -485,7 +485,7 @@ class Workflow(Base):
         return out
 
     def kill_active(self):
-        'Kill any active scheduled jobs associated with the workflow.'
+        """Kill any active scheduled jobs associated with the workflow."""
 
         kill_scheduler_ids = []
         for sub in self.submissions:
@@ -654,7 +654,7 @@ class CommandGroup(Base):
 
     @staticmethod
     def get_command_lines(commands):
-        'Get all lines in the commands list.'
+        """Get all lines in the commands list."""
         out = []
         for i in commands:
             if 'line' in i:
@@ -998,7 +998,7 @@ class Submission(Base):
         self._scheduler_groups = self.get_scheduler_groups()
 
     def _make_alternate_scratch_dirs(self):
-        'Create a new directory on each alternate scratch for this submission.'
+        """Create a new directory on each alternate scratch for this submission."""
 
         alt_scratches = self.workflow.all_alternate_scratch
 
@@ -1042,7 +1042,7 @@ class Submission(Base):
         return self._scheduler_groups
 
     def get_scheduler_groups(self):
-        'Get scheduler groups for this workflow submission.'
+        """Get scheduler groups for this workflow submission."""
         return SchedulerGroup.get_scheduler_groups(self)
 
     def get_scheduler_group_index(self, command_group_submission):
@@ -1383,7 +1383,7 @@ class Submission(Base):
         return job_id_str
 
     def get_stats(self, jsonable=True, datetime_dicts=False):
-        'Get task statistics for this submission.'
+        """Get task statistics for this submission."""
         out = {
             'submission_id': self.id_,
             'command_group_submissions': [
@@ -1507,7 +1507,7 @@ class CommandGroupSubmission(Base):
 
     @property
     def scheduler_group(self):
-        'Get the scheduler group to which this command group belongs.'
+        """Get the scheduler group to which this command group belongs."""
         return self.submission.get_scheduler_group(self)
 
     def get_command_group_submission_iteration(self, iteration):
@@ -1798,7 +1798,7 @@ class CommandGroupSubmission(Base):
             handle.write(cmd_lns)
 
     def write_alt_scratch_exclusion_list(self, project, task, iteration):
-        'Write alternate scratch exclusion files (for e.g. rsync)'
+        """Write alternate scratch exclusion files (for e.g. rsync)"""
 
         # List of Paths to exclude, relative to `self.submission.workflow.directory`:
         excluded_paths = [
@@ -1844,7 +1844,7 @@ class CommandGroupSubmission(Base):
                 handle.write(str(exc_path) + '\n')
 
     def make_alternate_scratch_dirs(self, project, iteration):
-        'Generate task working directories on the alternate scratch.'
+        """Generate task working directories on the alternate scratch."""
 
         # Get task working directories:
         cg_sub_iter = self.get_command_group_submission_iteration(iteration)
@@ -1905,7 +1905,7 @@ class CommandGroupSubmission(Base):
         self.command_group.archive.execute_with_lock(task)
 
     def get_stats(self, jsonable=True, datetime_dicts=False):
-        'Get task statistics for this command group submission.'
+        """Get task statistics for this command group submission."""
         out = {
             'command_group_submission_id': self.id_,
             'command_group_id': self.command_group.id_,
@@ -2005,7 +2005,7 @@ class IsCommandWriting(Base):
 
 
 class Task(Base):
-    'Class to represent a single task.'
+    """Class to represent a single task."""
 
     __tablename__ = 'task'
 
@@ -2067,7 +2067,7 @@ class Task(Base):
 
     @property
     def scheduler_id(self):
-        'Get the task ID, as understood by the scheduler.'
+        """Get the task ID, as understood by the scheduler."""
         num_tasks = self.command_group_submission_iteration.num_outputs
         step_size = self.command_group_submission_iteration.step_size
         scheduler_range = range(1, 1 + (num_tasks * step_size), step_size)
@@ -2107,7 +2107,7 @@ class Task(Base):
             return None
 
     def get_working_directory(self):
-        'Get the "working directory" of this task.'
+        """Get the "working directory" of this task."""
         dir_vals = self.command_group_submission_iteration.get_directories()
         dirs_per_task = len(dir_vals) / \
             self.command_group_submission_iteration.num_outputs
@@ -2120,7 +2120,7 @@ class Task(Base):
         return self.get_working_directory().value
 
     def get_stats(self, jsonable=True, datetime_dicts=False):
-        'Get statistics for this task.'
+        """Get statistics for this task."""
         out = {
             'task_id': self.id_,
             'order_id': self.order_id,
@@ -2281,7 +2281,7 @@ class Task(Base):
 
 
 class Iteration(Base):
-    'Class to represent a workflow iteration.'
+    """Class to represent a workflow iteration."""
 
     __tablename__ = 'iteration'
 
@@ -2422,14 +2422,14 @@ class CommandGroupSubmissionIteration(Base):
 
     @property
     def num_outputs(self):
-        'Get the number of outputs for this command group submission.'
+        """Get the number of outputs for this command group submission."""
         iteration = self.command_group_submission.submission.workflow.first_iteration
         return self.command_group_submission.scheduler_group.get_num_outputs(iteration)[
             self.command_group_submission.scheduler_group_index[1]]
 
     @property
     def step_size(self):
-        'Get the scheduler step size for this command group submission.'
+        """Get the scheduler step size for this command group submission."""
         iteration = self.command_group_submission.submission.workflow.first_iteration
         return self.command_group_submission.scheduler_group.get_step_size(iteration)[
             self.command_group_submission.scheduler_group_index[1]]
@@ -2439,7 +2439,7 @@ class CommandGroupSubmissionIteration(Base):
         return len(self.tasks)
 
     def write_working_directories(self, project):
-        'Replace lines in the working_dirs files with actual directory paths.'
+        """Replace lines in the working_dirs files with actual directory paths."""
 
         dir_vals = self.get_directories()
 
@@ -2565,7 +2565,7 @@ class SchedulerGroup(object):
 
     @classmethod
     def get_scheduler_groups(cls, submission):
-        'Split the command group submissions up into scheduler groups.'
+        """Split the command group submissions up into scheduler groups."""
 
         cmd_groups_split = []
         sch_group_idx = 0

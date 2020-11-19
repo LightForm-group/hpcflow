@@ -6,7 +6,6 @@ Module that exposes a command line interface for `hpcflow`.
 import socket
 import os
 from pathlib import Path
-from pprint import pprint
 from datetime import datetime
 from random import randint
 
@@ -266,7 +265,7 @@ def stat():
 @click.option('--workflow-id', '-w', type=click.INT)
 @click.option('--config-dir', type=click.Path(exists=True))
 def show_stats(directory=None, workflow_id=None, config_dir=None):
-    'Show task statistics, formatted as a table.'
+    """Show task statistics, formatted as a table."""
     stats_fmt = api.get_formatted_stats(directory, workflow_id, config_dir=config_dir)
     print(stats_fmt)
 
@@ -277,7 +276,7 @@ def show_stats(directory=None, workflow_id=None, config_dir=None):
 @click.option('--config-dir', type=click.Path(exists=True))
 @click.argument('save_path', type=click.Path(exists=False, dir_okay=False))
 def save_stats(save_path, directory=None, workflow_id=None, config_dir=None):
-    'Save task statistics as a JSON file.'
+    """Save task statistics as a JSON file."""
     api.save_stats(save_path, directory, workflow_id, config_dir=config_dir)
 
 
@@ -379,7 +378,7 @@ def cloud_connect(provider, config_dir=None):
 
 @cli.group()
 def dummy():
-    'Dummy commands for testing/documentation.'
+    """Dummy commands for testing/documentation."""
 
 
 @dummy.command('makeSomething')

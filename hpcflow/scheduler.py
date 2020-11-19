@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from subprocess import run, PIPE
-from pprint import pprint
 
 from hpcflow.config import Config as CONFIG
 from hpcflow._version import __version__
