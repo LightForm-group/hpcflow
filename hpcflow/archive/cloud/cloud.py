@@ -40,7 +40,9 @@ class CloudProvider(ABC):
 class DropboxCloudProvider(CloudProvider):
     def __init__(self):
         env_var_name = 'DROPBOX_TOKEN'
-        token = Config.get('dropbox_token') or os.getenv(env_var_name)
+        token = os.getenv(env_var_name)
+        if not token:
+            token = Config.get('dropbox_token')
         if not token:
             msg = ('Please set the Dropbox access token in an environment variable '
                    f'"{env_var_name}", or in the config file as "dropbox_token".')
@@ -264,31 +266,6 @@ class DropboxCloudProvider(CloudProvider):
         except dropbox.exceptions.ApiError:
             return False
 
-    def get_token(self) -> str:
-        APP_KEY = Config.get('dropbox_app_key')
-        auth_flow = dropbox.DropboxOAuth2FlowNoRedirect(APP_KEY, use_pkce=True)
-        authorize_url = auth_flow.start()
-
-        msg = dedent(f"""
-        --------------------------- Connecting hpcflow to Dropbox ----------------------------
-
-            1. Go to this URL:
-
-            {authorize_url}
-
-            2. Click "Allow" (you might have to log in first).
-            3. Copy the authorization code below.
-
-        --------------------------------------------------------------------------------------
-        """)
-        print(msg)
-
-        auth_code = input('Enter the authorization code here: ').strip()
-        oauth_result = auth_flow.finish(auth_code)
-        token = oauth_result.access_token
-
-        return token
-
     @staticmethod
     def _normalise_path(path) -> str:
         """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
@@ -298,8 +275,34 @@ class DropboxCloudProvider(CloudProvider):
         return path
 
 
-def new_cloud_provider(type: str) -> CloudProvider:
-    if type == "dropbox":
+def get_token() -> str:
+    APP_KEY = Config.get('dropbox_app_key')
+    auth_flow = dropbox.DropboxOAuth2FlowNoRedirect(APP_KEY, use_pkce=True)
+    authorize_url = auth_flow.start()
+
+    msg = dedent(f"""
+    --------------------------- Connecting hpcflow to Dropbox ----------------------------
+
+        1. Go to this URL:
+
+        {authorize_url}
+
+        2. Click "Allow" (you might have to log in first).
+        3. Copy the authorization code below.
+
+    --------------------------------------------------------------------------------------
+    """)
+    print(msg)
+
+    auth_code = input('Enter the authorization code here: ').strip()
+    oauth_result = auth_flow.finish(auth_code)
+    token = oauth_result.access_token
+
+    return token
+
+
+def new_cloud_provider(cloud_type: str) -> CloudProvider:
+    if cloud_type == "dropbox":
         return DropboxCloudProvider()
     else:
-        raise KeyError(f"Unknown cloud provider {type}.")
+        raise KeyError(f"Unknown cloud provider {cloud_type}.")

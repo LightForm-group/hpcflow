@@ -11,12 +11,13 @@ import json
 
 from beautifultable import BeautifulTable
 
+from hpcflow.archive.archive import CloudProviderType
 from hpcflow.config import Config
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, CommandGroupSubmission
 from hpcflow.profiles import parse_job_profiles, prepare_workflow_dict
 from hpcflow.project import Project
-from hpcflow.archive.cloud.cloud import CloudProvider
+from hpcflow.archive.cloud.cloud import CloudProvider, DropboxCloudProvider, get_token
 
 
 def make_workflow(dir_path=None, profile_list=None, json_file=None, json_str=None,
@@ -439,7 +440,7 @@ def update_config(name, value, config_dir=None):
 def cloud_connect(provider, config_dir=None):
     Config.set_config(config_dir)
     token_key = {'dropbox': 'dropbox_token'}[provider.lower()]
-    provider = {'dropbox': CloudProvider.dropbox}[provider.lower()]
+    provider = {'dropbox': CloudProviderType.dropbox}[provider.lower()]
     token = Config.get(token_key)
     good = False
     if token:
@@ -452,5 +453,5 @@ def cloud_connect(provider, config_dir=None):
             pass
     if not good:
         print('Getting new cloud token.')
-        token = provider.get_token()
+        token = get_token()
         update_config(token_key, token, config_dir=config_dir)

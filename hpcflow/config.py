@@ -7,7 +7,7 @@ from ruamel.yaml import YAML
 from hpcflow.errors import ConfigurationError
 
 
-class Config(object):
+class Config:
 
     __PROFILE_KEYS_REQ = [
         'command_groups',

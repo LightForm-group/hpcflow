@@ -13,12 +13,12 @@ from shutil import ignore_patterns
 from time import sleep
 
 from sqlalchemy import (Table, Column, Integer, ForeignKey, String,
-                        UniqueConstraint, Enum, Boolean)
+                        UniqueConstraint, Enum, Boolean, PickleType)
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from hpcflow.config import Config as CONFIG
-from hpcflow.archive.cloud.cloud import CloudProvider
+from hpcflow.archive.cloud.cloud import new_cloud_provider
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.base_db import Base
@@ -41,6 +41,13 @@ archive_is_active = Table(
         primary_key=True
     ),
 )
+
+
+class CloudProviderType(enum.Enum):
+
+    dropbox = "dropbox"
+    onedrive = "onedrive"
+    null = ""
 
 
 class RootDirectoryName(enum.Enum):
@@ -70,7 +77,8 @@ class Archive(Base):
     name = Column(String(255))
     _path = Column('path', String(255))
     host = Column(String(255))
-    cloud_provider = Column(Enum(CloudProvider))
+    cloud_provider_type = Column(Enum(CloudProviderType))
+    cloud_provider = Column(PickleType)
     root_directory_name = Column(Enum(RootDirectoryName))
     root_directory_increment = Column(Boolean)
 
@@ -84,7 +92,8 @@ class Archive(Base):
         self.name = name
         self._path = path
         self.host = host
-        self.cloud_provider = CloudProvider(cloud_provider)
+        self.cloud_provider_type = CloudProviderType(cloud_provider)
+        self.cloud_provider = new_cloud_provider(self.cloud_provider_type.name)
         self.root_directory_name = RootDirectoryName(root_directory_name)
         self.root_directory_increment = root_directory_increment
 
@@ -106,7 +115,7 @@ class Archive(Base):
         """
 
         if not self.host:
-            if self.cloud_provider != CloudProvider.null:
+            if self.cloud_provider_type != CloudProviderType.null:
                 directories = self.cloud_provider.get_directories(self.path)
             else:
                 directories = [i.name for i in self.path.glob('*') if i.is_dir()]
@@ -119,7 +128,7 @@ class Archive(Base):
         """Check if a given directory exists on the Archive."""
 
         if not self.host:
-            if self.cloud_provider != CloudProvider.null:
+            if self.cloud_provider_type != CloudProviderType.null:
                 exists = self.cloud_provider.check_exists(directory)
             else:
                 exists = directory.is_dir()
@@ -137,6 +146,8 @@ class Archive(Base):
                 archive_dir = workflow.directory.stem
             elif self.root_directory_name == RootDirectoryName.datetime:
                 archive_dir = time.strftime('%Y-%m-%d-%H%M')
+            else:
+                raise KeyError("Unknown root directory type.")
 
             sub_dirs = self.get_directories()
             if archive_dir in sub_dirs:
@@ -151,8 +162,7 @@ class Archive(Base):
                             raise RuntimeError(msg)
                         archive_dir = archive_dir + '_1'
                 else:
-                    msg = ('Archive directory "{}" already exists.')
-                    raise ValueError(msg.format(archive_dir))
+                    raise ValueError(f'Archive directory "{archive_dir}" already exists.')
 
         else:
             archive_dir = ''
@@ -283,7 +293,7 @@ class Archive(Base):
 
         try:
 
-            if self.cloud_provider != CloudProvider.null:
+            if self.cloud_provider_type != CloudProviderType.null:
                 try:
                     self.cloud_provider.archive_directory(src_dir, dst_dir, ignore)
                 except (CloudProviderError, CloudCredentialsError, ArchiveError) as err:
