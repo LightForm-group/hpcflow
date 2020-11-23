@@ -17,8 +17,9 @@ from sqlalchemy import (Table, Column, Integer, ForeignKey, String,
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider
 from hpcflow.config import Config as CONFIG
-from hpcflow.archive.cloud.cloud import new_cloud_provider
+from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.base_db import Base
@@ -129,7 +130,7 @@ class Archive(Base):
 
         if not self.host:
             if self.cloud_provider_type != CloudProviderType.null:
-                exists = self.cloud_provider.check_exists(directory)
+                exists = self.cloud_provider.check_directory_exists(directory)
             else:
                 exists = directory.is_dir()
         else:
@@ -315,3 +316,10 @@ class Archive(Base):
         copy_seconds = (end - start).total_seconds()
         print('Archive to "{}" took {} seconds'.format(
             self.name, copy_seconds), flush=True)
+
+
+def new_cloud_provider(cloud_type: str, token: str = None) -> CloudProvider:
+    if cloud_type == "dropbox":
+        return DropboxCloudProvider(token)
+    else:
+        raise KeyError(f"Unknown cloud provider {cloud_type}.")

@@ -11,7 +11,7 @@ from random import randint
 
 import click
 
-from hpcflow._version import __version__
+from hpcflow import __version__
 from hpcflow import api
 
 
