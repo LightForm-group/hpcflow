@@ -117,7 +117,7 @@ class DropboxCloudProvider(CloudProvider):
                         if archive:
                             self._archive_file(src_file, dst_dir)
                         else:
-                            self._upload_dropbox_file(src_file, dst_dir, overwrite, auto_rename)
+                            self._upload_file_to_dropbox(src_file, dst_dir, overwrite, auto_rename)
                     except ArchiveError as err:
                         print(f'Archive error: {err}', flush=True)
                         continue
@@ -195,11 +195,12 @@ class DropboxCloudProvider(CloudProvider):
                 msg = 'Unexpected error.'
                 raise CloudProviderError(msg)
 
-        self._upload_dropbox_file(local_path, dropbox_path, overwrite, auto_rename, client_modified)
+        self._upload_file_to_dropbox(local_path, dropbox_path, overwrite, auto_rename,
+                                     client_modified)
 
-    def _upload_dropbox_file(self, local_path: Union[str, Path],
-                             dropbox_dir: Union[str, Path],
-                             overwrite=False, auto_rename=True, client_modified=None):
+    def _upload_file_to_dropbox(self, local_path: Union[str, Path],
+                                dropbox_dir: Union[str, Path],
+                                overwrite=False, auto_rename=True, client_modified=None):
         """
         Parameters
         ----------
@@ -211,31 +212,40 @@ class DropboxCloudProvider(CloudProvider):
             If True, the file overwrites an existing file with the same name.
         auto_rename : bool
             If True, rename the file if there is a conflict.
+        client_modified: datetime
+            Dropbox uses this time as the "last modified" file metadata. If None it defaults
+            to the upload time.
         """
         local_path = Path(local_path)
-        dropbox_path = self._normalise_path(Path(dropbox_dir).joinpath(local_path.name))
+        dropbox_path = Path(dropbox_dir).joinpath(local_path.name)
+        dropbox_path = self._normalise_path(dropbox_path)
 
-        if overwrite:
-            mode = dropbox.dropbox.files.WriteMode('overwrite', None)
-        else:
-            mode = dropbox.dropbox.files.WriteMode('add', None)
+        mode = self._get_overwrite_mode(overwrite)
 
         try:
-            with local_path.open(mode='rb') as handle:
-
-                try:
-                    self.dropbox_connection.files_upload(handle.read(), dropbox_path, mode,
-                                                         auto_rename, client_modified)
-
-                except dropbox.exceptions.ApiError as err:
-                    msg = ('Cloud provider error. {}'.format(err))
-                    raise CloudProviderError(msg)
-                except Exception:
-                    msg = 'Unexpected error.'
-                    raise CloudProviderError(msg)
-
+            handle = local_path.open(mode='rb')
         except FileNotFoundError as err:
             raise ArchiveError(err)
+
+        try:
+            self.dropbox_connection.files_upload(handle.read(), dropbox_path, mode,
+                                                 auto_rename, client_modified)
+        except dropbox.exceptions.ApiError as err:
+            raise CloudProviderError(f'Cloud provider error. {err}')
+        except Exception:
+            raise CloudProviderError('Unexpected error.')
+
+        handle.close()
+
+    @staticmethod
+    def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
+        """Get the tag that determines behaviour when an uploaded file already exists
+        in the destination. If `overwrite` is True then overwrite existing files else add the new
+        file with a different name, leaving the old file."""
+        if overwrite:
+            return dropbox.dropbox.files.WriteMode('overwrite')
+        else:
+            return dropbox.dropbox.files.WriteMode('add')
 
     def get_directories(self, path: Union[str, Path]) -> List[str]:
         """Get a list of sub directories within a path"""
@@ -258,9 +268,12 @@ class DropboxCloudProvider(CloudProvider):
     @staticmethod
     def _normalise_path(path) -> str:
         """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
+        # The path of the Dropbox root directory is an empty string.
         if path == ".":
             return ""
+        # It is not clear what this line is doing.
         path = posixpath.join(*str(path).split(os.path.sep))
+        # All dropbox paths must be prepended by a forward slash.
         if not path.startswith('/'):
             path = '/' + path
         return path
