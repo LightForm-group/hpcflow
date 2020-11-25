@@ -198,9 +198,9 @@ class DropboxCloudProvider(CloudProvider):
         self._upload_file_to_dropbox(local_path, dropbox_path, overwrite, auto_rename,
                                      client_modified)
 
-    def _upload_file_to_dropbox(self, local_path: Union[str, Path],
-                                dropbox_dir: Union[str, Path],
-                                overwrite=False, auto_rename=True, client_modified=None):
+    def _upload_file_to_dropbox(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
+                                overwrite=False, auto_rename=True,
+                                client_modified=None) -> dropbox.files.FileMetadata:
         """
         Parameters
         ----------
@@ -222,24 +222,17 @@ class DropboxCloudProvider(CloudProvider):
 
         mode = self._get_overwrite_mode(overwrite)
 
-        file_contents = self._read_file_contents(local_path)
+        file_contents = _read_file_contents(local_path)
 
         try:
-            self.dropbox_connection.files_upload(file_contents, dropbox_path, mode,
-                                                 auto_rename, client_modified)
+            file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path, mode,
+                                                                 auto_rename, client_modified)
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(f'Cloud provider error. {err}')
         except Exception:
             raise CloudProviderError('Unexpected error.')
-
-    @staticmethod
-    def _read_file_contents(path: Path) -> bytes:
-        """Try to read the file at `path` in binary format and return its contents. """
-        try:
-            with path.open(mode='rb') as handle:
-                return handle.read()
-        except FileNotFoundError as err:
-            raise ArchiveError(err)
+        else:
+            return file_metadata
 
     @staticmethod
     def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
@@ -266,13 +259,23 @@ class DropboxCloudProvider(CloudProvider):
         try:
             meta = self.dropbox_connection.files_get_metadata(directory)
             return isinstance(meta, dropbox.files.FolderMetadata)
-        except dropbox.exceptions.ApiError:
-            return False
+        except dropbox.exceptions.ApiError as err:
+            raise CloudProviderError(err)
 
 
-def _normalise_path(path) -> str:
+def _read_file_contents(path: Path) -> bytes:
+    """Try to read the file at `path` in binary format and return its contents. """
+    try:
+        with path.open(mode='rb') as handle:
+            return handle.read()
+    except FileNotFoundError as err:
+        raise ArchiveError(err)
+
+
+def _normalise_path(path: Union[str, Path]) -> str:
     """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
     # The path of the Dropbox root directory is an empty string.
+    path = str(path)
     if path == ".":
         return ""
     # All dropbox paths must be posix style and prepended by a forward slash.
