@@ -453,5 +453,5 @@ def cloud_connect(provider, config_dir=None):
             pass
     if not good:
         print('Getting new cloud token.')
-        token = dropbox.get_token()
+        token = dropbox.get_auth_code()
         update_config(token_key, token, config_dir=config_dir)

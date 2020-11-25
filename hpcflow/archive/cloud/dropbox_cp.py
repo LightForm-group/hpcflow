@@ -17,17 +17,10 @@ from hpcflow.config import Config
 
 
 class DropboxCloudProvider(CloudProvider):
+    """A DropboxCloudProvider provides methods for archiving directories and files to Dropbox."""
     def __init__(self, token: str = None):
-        env_var_name = 'DROPBOX_TOKEN'
         if token is None:
-            token = os.getenv(env_var_name)
-        if token is None:
-            token = Config.get('dropbox_token')
-        if token is None:
-            msg = ('Please set the Dropbox access token in an environment variable '
-                   f'"{env_var_name}", or in the config file as "dropbox_token".')
-            raise CloudCredentialsError(msg)
-
+            token = self._get_token()
         self.dropbox_connection = dropbox.Dropbox(token)
 
     def check_access(self) -> bool:
@@ -243,6 +236,19 @@ class DropboxCloudProvider(CloudProvider):
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(err)
 
+    @staticmethod
+    def _get_token() -> str:
+        """Search environment variables and the config for a Dropbox token."""
+        env_var_name = 'DROPBOX_TOKEN'
+        token = os.getenv(env_var_name)
+        if token is None:
+            token = Config.get('dropbox_token')
+        if token is None:
+            msg = ('Please set the Dropbox access token in an environment variable '
+                   f'"{env_var_name}", or in the config file as "dropbox_token".')
+            raise CloudCredentialsError(msg)
+        return token
+
 
 def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
     """Get the tag that determines behaviour when an uploaded file already exists
@@ -288,7 +294,14 @@ def _normalise_path(path: Union[str, Path]) -> str:
     return path
 
 
-def get_token() -> str:
+def get_auth_code() -> str:
+    """In order to connect to dropbox HPCFlow must be authenticated with Dropbox as a valid app.
+    This is done by the user getting an authorisation token from a url and providing it to HPCflow.
+    HPCflow then uses this auth token to get an API token from Drobox.
+
+    This function prompts the user to go to the auth token url, accepts it as input and gets and
+    returns the subsequent API token.
+    """
     APP_KEY = Config.get('dropbox_app_key')
     auth_flow = dropbox.DropboxOAuth2FlowNoRedirect(APP_KEY, use_pkce=True)
     authorize_url = auth_flow.start()
@@ -309,6 +322,4 @@ def get_token() -> str:
 
     auth_code = input('Enter the authorization code here: ').strip()
     oauth_result = auth_flow.finish(auth_code)
-    token = oauth_result.access_token
-
-    return token
+    return oauth_result.access_token

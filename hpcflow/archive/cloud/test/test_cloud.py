@@ -41,7 +41,8 @@ class MockFolderList:
 
 @pytest.mark.usefixtures("set_config")
 class TestDropboxCloudProvider:
-
+    """Tests for most of the methods in DropboxCloudProvider. Some longer methods have their own
+    test class."""
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
     def test_init_type(self, mock_dropbox, cloud_provider):
         assert isinstance(cloud_provider, DropboxCloudProvider)
@@ -84,6 +85,19 @@ class TestDropboxCloudProvider:
         mock_files_get_metadata.return_value = mock_folder
         assert cloud_provider.check_directory_exists("Sample Folder") is True
 
+    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    def test_get_dropbox_modified_time(self, mock_get_metadata, cloud_provider):
+        mock_get_metadata.return_value = Mock(spec=dropbox.files.FileMetadata,
+                                              client_modified=datetime.datetime.now())
+        time = cloud_provider.get_dropbox_file_modified_time("")
+        assert isinstance(time, datetime.datetime)
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    def test_failed_get_dropbox_modified_time(self, mock_get_metadata, cloud_provider):
+        mock_get_metadata.return_value = Mock(spec=dropbox.files.FolderMetadata)
+        with pytest.raises(ArchiveError):
+            cloud_provider.get_dropbox_file_modified_time("")
+
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_upload')
     @patch('hpcflow.archive.cloud.dropbox_cp._read_file_contents')
     def test_upload_file_to_dropbox(self, mock_read_file, mock_file_upload,
@@ -103,6 +117,10 @@ class TestDropboxCloudProvider:
         mock_file_upload.side_effect = dropbox.exceptions.ApiError("", "", "", "")
         with pytest.raises(CloudProviderError):
             cloud_provider._upload_file_to_dropbox("", "")
+
+
+class TestArchiveFile:
+    """Tests for the _archive_file method of DropboxCloudProvider."""
 
 
 class TestStaticMethods:
