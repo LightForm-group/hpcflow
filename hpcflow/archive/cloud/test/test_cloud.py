@@ -1,3 +1,4 @@
+import datetime
 from pathlib import Path
 from unittest.mock import patch, Mock
 
@@ -83,25 +84,6 @@ class TestDropboxCloudProvider:
         mock_files_get_metadata.return_value = mock_folder
         assert cloud_provider.check_directory_exists("Sample Folder") is True
 
-    def test_normalise_path(self):
-        assert dropbox_cp._normalise_path(".") == ""
-        assert dropbox_cp._normalise_path(r"Documents\Fred") == "/Documents/Fred"
-        assert dropbox_cp._normalise_path("Documents/Fred") == "/Documents/Fred"
-        assert dropbox_cp._normalise_path(Path(".")) == ""
-        assert dropbox_cp._normalise_path(Path(r"Documents\Fred")) == "/Documents/Fred"
-        assert dropbox_cp._normalise_path(Path("Documents/Fred")) == "/Documents/Fred"
-
-    def test_read_file_contents(self):
-        sample_path = Path(__file__).parent / "sample_file.txt"
-        file_contents = dropbox_cp._read_file_contents(sample_path)
-        assert isinstance(file_contents, bytes) is True
-        assert file_contents == b"Sample file used for testing."
-
-    def test_read_missing_file(self):
-        sample_path = Path("non-existent-path")
-        with pytest.raises(ArchiveError):
-            dropbox_cp._read_file_contents(sample_path)
-
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_upload')
     @patch('hpcflow.archive.cloud.dropbox_cp._read_file_contents')
     def test_upload_file_to_dropbox(self, mock_read_file, mock_file_upload,
@@ -121,3 +103,35 @@ class TestDropboxCloudProvider:
         mock_file_upload.side_effect = dropbox.exceptions.ApiError("", "", "", "")
         with pytest.raises(CloudProviderError):
             cloud_provider._upload_file_to_dropbox("", "")
+
+
+class TestStaticMethods:
+    """Tests for methods in the dropbox_cp file that are not assocated with the
+    DropboxCloudProvider object"""
+
+    def test_read_file_contents(self):
+        sample_path = Path(__file__).parent / "sample_file.txt"
+        file_contents = dropbox_cp._read_file_contents(sample_path)
+        assert isinstance(file_contents, bytes) is True
+        assert file_contents == b"Sample file used for testing."
+
+    def test_read_missing_file(self):
+        sample_path = Path("non-existent-path")
+        with pytest.raises(ArchiveError):
+            dropbox_cp._read_file_contents(sample_path)
+
+    def test_normalise_path(self):
+        assert dropbox_cp._normalise_path(".") == ""
+        assert dropbox_cp._normalise_path(r"Documents\Fred") == "/Documents/Fred"
+        assert dropbox_cp._normalise_path("Documents/Fred") == "/Documents/Fred"
+        assert dropbox_cp._normalise_path(Path(".")) == ""
+        assert dropbox_cp._normalise_path(Path(r"Documents\Fred")) == "/Documents/Fred"
+        assert dropbox_cp._normalise_path(Path("Documents/Fred")) == "/Documents/Fred"
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.Path.stat')
+    def test_client_modified_time(self, mock_stat_function):
+        mock_stat_function.return_value = Mock(st_mtime=1606327099)
+        modified_time = dropbox_cp.get_client_modified_time(Path(__file__))
+        assert isinstance(modified_time, datetime.datetime)
+        assert modified_time == datetime.datetime(year=2020, month=11, day=25, hour=17, minute=58,
+                                                  second=19)

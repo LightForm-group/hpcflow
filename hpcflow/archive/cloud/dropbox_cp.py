@@ -1,6 +1,5 @@
 import os
-from pathlib import Path, PurePosixPath
-import posixpath
+from pathlib import Path
 import fnmatch
 from datetime import datetime
 
@@ -145,6 +144,7 @@ class DropboxCloudProvider(CloudProvider):
             Directory on Dropbox into which the file should be uploaded.
 
         """
+        # Default parameter values
         overwrite = False
         auto_rename = False
         client_modified = None
@@ -156,20 +156,7 @@ class DropboxCloudProvider(CloudProvider):
             overwrite = True
 
         else:
-            # Note: Dropbox culls microseconds from the datetime passed as the
-            # `client_modified` parameter (it does not round).
-            # Ref: ("https://www.dropboxforum.com/t5/API-Support-Feedback/Python-API-client"
-            #           "-modified-resolution/m-p/362170/highlight/true#M20596")
-            ts_sec = local_path.stat().st_mtime_ns / 1e9
-            dt = datetime.utcfromtimestamp(ts_sec)
-            client_modified = datetime(  # no microseconds
-                year=dt.year,
-                month=dt.month,
-                day=dt.day,
-                hour=dt.hour,
-                minute=dt.minute,
-                second=dt.second,
-            )
+            client_modified = get_client_modified_time(local_path)
 
             try:
                 # Check for existing file
@@ -261,6 +248,18 @@ class DropboxCloudProvider(CloudProvider):
             return isinstance(meta, dropbox.files.FolderMetadata)
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(err)
+
+
+def get_client_modified_time(local_path: Path):
+    """Gets the last modified time of a file and converts it to a dropbox compatible time by
+    culling the microseconds."""
+    # Note: Dropbox culls microseconds from the datetime passed as the
+    # `client_modified` parameter (it does not round).
+    # Ref: ("https://www.dropboxforum.com/t5/API-Support-Feedback/Python-API-client"
+    #           "-modified-resolution/m-p/362170/highlight/true#M20596")
+    ts_sec = local_path.stat().st_mtime
+    dt = datetime.utcfromtimestamp(ts_sec).replace(microsecond=0)
+    return dt
 
 
 def _read_file_contents(path: Path) -> bytes:
