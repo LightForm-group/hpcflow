@@ -126,7 +126,7 @@ class DropboxCloudProvider(CloudProvider):
                         continue
 
     def _archive_file(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
-                      check_modified_time=True):
+                      check_modified_time=True) -> Union[dropbox.files.Metadata, None]:
         """Upload a file to a dropbox directory such that if the local file is newer than the
         copy on Dropbox, the newer file overwrites the older file, and if the local file is
         older than the copy on Dropbox, the local file is uploaded with an "auto-incremented"
@@ -143,47 +143,51 @@ class DropboxCloudProvider(CloudProvider):
         dropbox_dir : str or Path
             Directory on Dropbox into which the file should be uploaded.
 
+        Returns
+        --------
+        FileMetadata of file if file uploaded. If file not uploaded return None.
         """
-        # Default parameter values
-        overwrite = False
-        auto_rename = False
-        client_modified = None
 
         local_path = Path(local_path)
         dropbox_path = _normalise_path(Path(dropbox_dir).joinpath(local_path.name))
 
         if not check_modified_time:
-            overwrite = True
+            return self._upload_file_to_dropbox(local_path, dropbox_path,
+                                                overwrite=True, auto_rename=False)
+
+        client_modified = get_client_modified_time(local_path)
+
+        try:
+            # Try to get the last modified time of the file on Dropbox
+            existing_modified = self.get_dropbox_file_modified_time(dropbox_path)
+        except dropbox.exceptions.ApiError:
+            # File does not exist on dropbox
+            return self._upload_file_to_dropbox(local_path, dropbox_path)
+        except Exception:
+            raise CloudProviderError('Unexpected error.')
+
+        if client_modified == existing_modified:
+            # If file on Dropbox has the same modified time as the client file then don't upload.
+            return None
+
+        elif client_modified < existing_modified:
+            # If the client file is older than the file on dropbox
+            return self._upload_file_to_dropbox(local_path, dropbox_path,
+                                                client_modified=client_modified)
 
         else:
-            client_modified = get_client_modified_time(local_path)
+            # If the client file is newer than the one on dropbox then overwrite the one on dropbox
+            return self._upload_file_to_dropbox(local_path, dropbox_path, overwrite=True,
+                                                client_modified=client_modified)
 
-            try:
-                # Check for existing file
-                existing_file = self.dropbox_connection.files_get_metadata(dropbox_path)
-                existing_modified = existing_file.client_modified
-
-                if client_modified == existing_modified:
-                    print('client_modified time same!')
-                    return
-
-                elif client_modified < existing_modified:
-                    auto_rename = True
-                    print('client file older!')
-
-                elif client_modified > existing_modified:
-                    overwrite = True
-                    print('client file newer!')
-
-            except dropbox.exceptions.ApiError:
-                print('File does not exist.')
-
-            except Exception:
-                msg = 'Unexpected error.'
-                raise CloudProviderError(msg)
-
-        self._upload_file_to_dropbox(local_path, dropbox_path, overwrite, auto_rename,
-                                     client_modified)
+    def get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
+        """Get the last modified time of a file on Dropbox. Raises `dropbox.exceptions.ApiError`
+        if the file does not exist."""
+        existing_file = self.dropbox_connection.files_get_metadata(dropbox_path)
+        if isinstance(existing_file, dropbox.files.FileMetadata):
+            return existing_file.client_modified
+        else:
+            raise ArchiveError("Provided path is not a file.")
 
     def _upload_file_to_dropbox(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
                                 overwrite=False, auto_rename=True,
@@ -207,7 +211,7 @@ class DropboxCloudProvider(CloudProvider):
         dropbox_path = Path(dropbox_dir).joinpath(local_path.name)
         dropbox_path = _normalise_path(dropbox_path)
 
-        mode = self._get_overwrite_mode(overwrite)
+        mode = _get_overwrite_mode(overwrite)
 
         file_contents = _read_file_contents(local_path)
 
@@ -220,16 +224,6 @@ class DropboxCloudProvider(CloudProvider):
             raise CloudProviderError('Unexpected error.')
         else:
             return file_metadata
-
-    @staticmethod
-    def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
-        """Get the tag that determines behaviour when an uploaded file already exists
-        in the destination. If `overwrite` is True then overwrite existing files else add the new
-        file with a different name, leaving the old file."""
-        if overwrite:
-            return dropbox.dropbox.files.WriteMode('overwrite')
-        else:
-            return dropbox.dropbox.files.WriteMode('add')
 
     def get_directories(self, path: Union[str, Path]) -> List[str]:
         """Get a list of sub directories within a path"""
@@ -248,6 +242,16 @@ class DropboxCloudProvider(CloudProvider):
             return isinstance(meta, dropbox.files.FolderMetadata)
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(err)
+
+
+def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
+    """Get the tag that determines behaviour when an uploaded file already exists
+    in the destination. If `overwrite` is True then overwrite existing files else add the new
+    file with a different name, leaving the old file."""
+    if overwrite:
+        return dropbox.dropbox.files.WriteMode('overwrite')
+    else:
+        return dropbox.dropbox.files.WriteMode('add')
 
 
 def get_client_modified_time(local_path: Path):

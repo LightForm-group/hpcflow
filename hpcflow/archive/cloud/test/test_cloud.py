@@ -106,7 +106,7 @@ class TestDropboxCloudProvider:
 
 
 class TestStaticMethods:
-    """Tests for methods in the dropbox_cp file that are not assocated with the
+    """Tests for methods in the dropbox_cp file that are not associated with the
     DropboxCloudProvider object"""
 
     def test_read_file_contents(self):
