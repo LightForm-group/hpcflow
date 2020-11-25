@@ -5,7 +5,7 @@ import dropbox
 import dropbox.exceptions
 import dropbox.files
 
-from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider
+from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider, _normalise_path
 from hpcflow.config import Config
 
 
@@ -72,3 +72,8 @@ class TestDropboxCloudProvider:
         mock_files_get_metadata.return_value = mock_folder
         cloud_provider = DropboxCloudProvider()
         assert cloud_provider.check_directory_exists("Sample Folder") is True
+
+    def test_normalise_path(self):
+        assert _normalise_path(".") == ""
+        assert _normalise_path(r"Documents\Fred") == "/Documents/Fred"
+        assert _normalise_path("Documents/Fred") == "/Documents/Fred"

@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import posixpath
 import fnmatch
 from datetime import datetime
@@ -150,7 +150,7 @@ class DropboxCloudProvider(CloudProvider):
         client_modified = None
 
         local_path = Path(local_path)
-        dropbox_path = self._normalise_path(Path(dropbox_dir).joinpath(local_path.name))
+        dropbox_path = _normalise_path(Path(dropbox_dir).joinpath(local_path.name))
 
         if not check_modified_time:
             overwrite = True
@@ -218,7 +218,7 @@ class DropboxCloudProvider(CloudProvider):
         """
         local_path = Path(local_path)
         dropbox_path = Path(dropbox_dir).joinpath(local_path.name)
-        dropbox_path = self._normalise_path(dropbox_path)
+        dropbox_path = _normalise_path(dropbox_path)
 
         mode = self._get_overwrite_mode(overwrite)
 
@@ -253,7 +253,7 @@ class DropboxCloudProvider(CloudProvider):
 
     def get_directories(self, path: Union[str, Path]) -> List[str]:
         """Get a list of sub directories within a path"""
-        path = self._normalise_path(path)
+        path = _normalise_path(path)
         directory_list = []
         for item in self.dropbox_connection.files_list_folder(path).entries:
             if isinstance(item, dropbox.files.FolderMetadata):
@@ -262,25 +262,24 @@ class DropboxCloudProvider(CloudProvider):
 
     def check_directory_exists(self, directory: Union[str, Path]):
         """Check a given directory exists on the cloud storage."""
-        directory = self._normalise_path(directory)
+        directory = _normalise_path(directory)
         try:
             meta = self.dropbox_connection.files_get_metadata(directory)
             return isinstance(meta, dropbox.files.FolderMetadata)
         except dropbox.exceptions.ApiError:
             return False
 
-    @staticmethod
-    def _normalise_path(path) -> str:
-        """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
-        # The path of the Dropbox root directory is an empty string.
-        if path == ".":
-            return ""
-        # It is not clear what this line is doing.
-        path = posixpath.join(*str(path).split(os.path.sep))
-        # All dropbox paths must be prepended by a forward slash.
-        if not path.startswith('/'):
-            path = '/' + path
-        return path
+
+def _normalise_path(path) -> str:
+    """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
+    # The path of the Dropbox root directory is an empty string.
+    if path == ".":
+        return ""
+    # All dropbox paths must be posix style and prepended by a forward slash.
+    path = path.replace('\\', '/')
+    if not path.startswith('/'):
+        path = '/' + path
+    return path
 
 
 def get_token() -> str:
