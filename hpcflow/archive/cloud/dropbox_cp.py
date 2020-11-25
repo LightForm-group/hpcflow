@@ -222,20 +222,24 @@ class DropboxCloudProvider(CloudProvider):
 
         mode = self._get_overwrite_mode(overwrite)
 
-        try:
-            handle = local_path.open(mode='rb')
-        except FileNotFoundError as err:
-            raise ArchiveError(err)
+        file_contents = self._read_file_contents(local_path)
 
         try:
-            self.dropbox_connection.files_upload(handle.read(), dropbox_path, mode,
+            self.dropbox_connection.files_upload(file_contents, dropbox_path, mode,
                                                  auto_rename, client_modified)
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(f'Cloud provider error. {err}')
         except Exception:
             raise CloudProviderError('Unexpected error.')
 
-        handle.close()
+    @staticmethod
+    def _read_file_contents(path: Path) -> bytes:
+        """Try to read the file at `path` in binary format and return its contents. """
+        try:
+            with path.open(mode='rb') as handle:
+                return handle.read()
+        except FileNotFoundError as err:
+            raise ArchiveError(err)
 
     @staticmethod
     def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:

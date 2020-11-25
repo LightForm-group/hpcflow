@@ -50,7 +50,7 @@ class TestDropboxCloudProvider:
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.check_user')
     def test_check_invalid_access(self, mock_check_user):
-        mock_check_user.get.side_effects = dropbox.exceptions.AuthError
+        mock_check_user.side_effect = dropbox.exceptions.AuthError("", "")
         cloud_provider = DropboxCloudProvider()
         assert cloud_provider.check_access() is False
 
