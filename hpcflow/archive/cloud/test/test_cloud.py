@@ -49,7 +49,7 @@ class TestDropboxCloudProvider:
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
     def test_token_provided(self, mock_dropbox):
         _ = DropboxCloudProvider("aaa")
-        assert mock_dropbox.called_with("aaa")
+        mock_dropbox.assert_called_with("aaa")
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.check_user')
     def test_check_valid_access(self, mock_check_user, cloud_provider):
@@ -116,6 +116,28 @@ class TestDropboxCloudProvider:
         mock_file_upload.side_effect = dropbox.exceptions.ApiError("", "", "", "")
         with pytest.raises(CloudProviderError):
             cloud_provider._upload_file_to_dropbox("", "")
+
+
+class TestArchiveDirectory:
+    """Tests for the main function of DropboxCloudProvider - uploading of a directory."""
+    @patch('hpcflow.archive.cloud.dropbox_cp.Path.is_dir')
+    def test_upload_file(self, mock_is_dir, cloud_provider):
+        mock_is_dir.return_value = False
+        with pytest.raises(ValueError):
+            cloud_provider.archive_directory("a_file_name.txt", ".")
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.Path.is_dir')
+    @patch('hpcflow.archive.cloud.dropbox_cp.os.walk')
+    @patch('hpcflow.archive.cloud.dropbox_cp.DropboxCloudProvider._archive_file')
+    def test_upload_directory(self, mock_archive_file, mock_os_walk, mock_is_dir, cloud_provider):
+        mock_is_dir.return_value = True
+        mock_os_walk.return_value = (("C:/upload", ["nested"], ["a.txt", "b.txt"]),
+                                     ("C:/upload/nested", [], ["c.txt"], ))
+        cloud_provider.archive_directory("C:/upload", "dest_folder")
+        mock_archive_file.assert_any_call(Path("C:/upload/a.txt"), Path("dest_folder"))
+        mock_archive_file.assert_any_call(Path("C:/upload/b.txt"), Path("dest_folder"))
+        mock_archive_file.assert_any_call(Path("C:/upload/nested/c.txt"),
+                                          Path("dest_folder/nested"))
 
 
 class TestStaticMethods:

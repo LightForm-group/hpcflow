@@ -35,7 +35,7 @@ class DropboxCloudProvider(CloudProvider):
             return False
 
     def archive_directory(self, local_path: Union[str, Path], remote_path: Union[str, Path],
-                          exclude: List[str]):
+                          exclude: List[str] = None):
         """
         Archive a the contents of a local directory into a directory on dropbox.
         Any files in the dropbox directory not in the source directory are ignored.
@@ -67,30 +67,28 @@ class DropboxCloudProvider(CloudProvider):
             raise ValueError(f'Specified `local_dir` is not a directory: {local_path}')
 
         for root, dirs, files in os.walk(str(local_path)):
-            root_test = Path(root)
-            dirs[:] = [d for d in dirs if d not in exclude]
             print(f'Uploading from root directory: {root}', flush=True)
 
             if exclude:
                 files = exclude_specified_files(files, exclude)
 
             for file_name in sorted(files):
-                src_file = root_test.joinpath(file_name)
+                src_file = Path(root).joinpath(file_name)
                 rel_path = src_file.relative_to(local_path)
                 dst_dir = remote_path.joinpath(rel_path.parent)
 
                 print(f'Uploading file: {file_name}', flush=True)
                 try:
                     self._archive_file(src_file, dst_dir)
-                except ArchiveError as err:
-                    print(f'Archive error: {err}', flush=True)
+                except ArchiveError:
+                    # This is raised if a file to be archived is not found
+                    continue
+                except CloudProviderError:
+                    # This is raised if a file is unable to be uploaded due to some sort
+                    # of problem with Dropbox
                     continue
 
-                except CloudProviderError as err:
-                    print(f'Cloud provider error: {err}', flush=True)
-                    continue
-
-    def _archive_file(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
+    def _archive_file(self, local_path: Path, dropbox_dir: Path,
                       check_modified_time=True) -> Union[dropbox.files.Metadata, None]:
         """Upload a file to a dropbox directory such that if the local file is newer than the
         copy on Dropbox, the newer file overwrites the older file, and if the local file is
@@ -103,9 +101,9 @@ class DropboxCloudProvider(CloudProvider):
 
         Parameters
         ----------
-        local_path : str or Path
+        local_path : Path
             Path of file on local computer to upload to dropbox.
-        dropbox_dir : str or Path
+        dropbox_dir : Path
             Directory on Dropbox into which the file should be uploaded.
 
         Returns
@@ -113,21 +111,19 @@ class DropboxCloudProvider(CloudProvider):
         FileMetadata of file if file uploaded. If file not uploaded return None.
         """
 
-        local_path = Path(local_path)
-        dropbox_path = _normalise_path(Path(dropbox_dir).joinpath(local_path.name))
-
         if not check_modified_time:
-            return self._upload_file_to_dropbox(local_path, dropbox_path,
+            return self._upload_file_to_dropbox(local_path, dropbox_dir,
                                                 overwrite=True, auto_rename=False)
 
         client_modified = _get_client_modified_time(local_path)
+        dropbox_path = _normalise_path(Path(dropbox_dir).joinpath(local_path.name))
 
         try:
             # Try to get the last modified time of the file on Dropbox
             existing_modified = self.get_dropbox_file_modified_time(dropbox_path)
         except dropbox.exceptions.ApiError:
             # File does not exist on dropbox
-            return self._upload_file_to_dropbox(local_path, dropbox_path)
+            return self._upload_file_to_dropbox(local_path, dropbox_dir)
         except Exception:
             raise CloudProviderError('Unexpected error.')
 
@@ -137,12 +133,12 @@ class DropboxCloudProvider(CloudProvider):
 
         elif client_modified < existing_modified:
             # If the client file is older than the file on dropbox
-            return self._upload_file_to_dropbox(local_path, dropbox_path,
+            return self._upload_file_to_dropbox(local_path, dropbox_dir,
                                                 client_modified=client_modified)
 
         else:
             # If the client file is newer than the one on dropbox then overwrite the one on dropbox
-            return self._upload_file_to_dropbox(local_path, dropbox_path, overwrite=True,
+            return self._upload_file_to_dropbox(local_path, dropbox_dir, overwrite=True,
                                                 client_modified=client_modified)
 
     def get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
@@ -183,10 +179,8 @@ class DropboxCloudProvider(CloudProvider):
         try:
             file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path, mode,
                                                                  auto_rename, client_modified)
-        except dropbox.exceptions.ApiError as err:
-            raise CloudProviderError(f'Cloud provider error. {err}')
-        except Exception:
-            raise CloudProviderError('Unexpected error.')
+        except Exception as err:
+            raise CloudProviderError(f'Cloud provider error: {err}')
         else:
             return file_metadata
 
