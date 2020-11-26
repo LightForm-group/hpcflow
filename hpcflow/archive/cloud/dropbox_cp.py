@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import fnmatch
 from datetime import datetime
 
 from textwrap import dedent
@@ -10,7 +9,7 @@ import dropbox
 import dropbox.exceptions
 import dropbox.files
 
-from hpcflow.archive.cloud.cloud import CloudProvider
+from hpcflow.archive.cloud.cloud import CloudProvider, exclude_specified_files, read_file_contents
 from hpcflow.archive.cloud.errors import CloudCredentialsError, CloudProviderError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.config import Config
@@ -88,8 +87,8 @@ class DropboxCloudProvider(CloudProvider):
                     # of problem with Dropbox
                     continue
 
-    def _archive_file(self, local_path: Path, dropbox_dir: Path,
-                      check_modified_time=True) -> Union[dropbox.files.Metadata, None]:
+    def _archive_file(self, local_path: Path,
+                      dropbox_dir: Path) -> Union[dropbox.files.Metadata, None]:
         """Upload a file to a dropbox directory such that if the local file is newer than the
         copy on Dropbox, the newer file overwrites the older file, and if the local file is
         older than the copy on Dropbox, the local file is uploaded with an "auto-incremented"
@@ -110,17 +109,12 @@ class DropboxCloudProvider(CloudProvider):
         --------
         FileMetadata of file if file uploaded. If file not uploaded return None.
         """
-
-        if not check_modified_time:
-            return self._upload_file_to_dropbox(local_path, dropbox_dir,
-                                                overwrite=True, auto_rename=False)
-
         client_modified = _get_client_modified_time(local_path)
         dropbox_path = _normalise_path(Path(dropbox_dir).joinpath(local_path.name))
 
         try:
             # Try to get the last modified time of the file on Dropbox
-            existing_modified = self.get_dropbox_file_modified_time(dropbox_path)
+            existing_modified = self._get_dropbox_file_modified_time(dropbox_path)
         except dropbox.exceptions.ApiError:
             # File does not exist on dropbox
             return self._upload_file_to_dropbox(local_path, dropbox_dir)
@@ -130,18 +124,14 @@ class DropboxCloudProvider(CloudProvider):
         if client_modified == existing_modified:
             # If file on Dropbox has the same modified time as the client file then don't upload.
             return None
-
         elif client_modified < existing_modified:
             # If the client file is older than the file on dropbox
-            return self._upload_file_to_dropbox(local_path, dropbox_dir,
-                                                client_modified=client_modified)
-
+            return self._upload_file_to_dropbox(local_path, dropbox_dir, False, client_modified)
         else:
             # If the client file is newer than the one on dropbox then overwrite the one on dropbox
-            return self._upload_file_to_dropbox(local_path, dropbox_dir, overwrite=True,
-                                                client_modified=client_modified)
+            return self._upload_file_to_dropbox(local_path, dropbox_dir, True, client_modified)
 
-    def get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
+    def _get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
         """Get the last modified time of a file on Dropbox. Raises `dropbox.exceptions.ApiError`
         if the file does not exist."""
         existing_file = self.dropbox_connection.files_get_metadata(dropbox_path)
@@ -151,7 +141,7 @@ class DropboxCloudProvider(CloudProvider):
             raise ArchiveError("Provided path is not a file.")
 
     def _upload_file_to_dropbox(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
-                                overwrite=False, auto_rename=True,
+                                overwrite=False,
                                 client_modified=None) -> dropbox.files.FileMetadata:
         """
         Parameters
@@ -162,8 +152,6 @@ class DropboxCloudProvider(CloudProvider):
             Directory on Dropbox into which the file should be uploaded.
         overwrite : bool
             If True, the file overwrites an existing file with the same name.
-        auto_rename : bool
-            If True, rename the file if there is a conflict.
         client_modified: datetime
             Dropbox uses this time as the "last modified" file metadata. If None it defaults
             to the upload time.
@@ -172,13 +160,14 @@ class DropboxCloudProvider(CloudProvider):
         dropbox_path = Path(dropbox_dir).joinpath(local_path.name)
         dropbox_path = _normalise_path(dropbox_path)
 
-        mode = _get_overwrite_mode(overwrite)
+        overwrite_mode = _get_overwrite_mode(overwrite)
 
-        file_contents = _read_file_contents(local_path)
+        file_contents = read_file_contents(local_path)
 
         try:
-            file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path, mode,
-                                                                 auto_rename, client_modified)
+            file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path,
+                                                                 overwrite_mode, True,
+                                                                 client_modified)
         except Exception as err:
             raise CloudProviderError(f'Cloud provider error: {err}')
         else:
@@ -216,14 +205,6 @@ class DropboxCloudProvider(CloudProvider):
         return token
 
 
-def exclude_specified_files(files: List[str], exclude: List[str]) -> List[str]:
-    """Remove any file from `files` that matches a pattern in `exclude`."""
-    files_to_exclude = [fnmatch.filter(files, pattern) for pattern in exclude]
-    # Flatten list of lists
-    files_to_exclude = [item for sublist in files_to_exclude for item in sublist]
-    return list(set(files) - set(files_to_exclude))
-
-
 def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
     """Get the tag that determines behaviour when an uploaded file already exists
     in the destination. If `overwrite` is True then overwrite existing files else add the new
@@ -246,15 +227,6 @@ def _get_client_modified_time(local_path: Path):
     return dt
 
 
-def _read_file_contents(path: Path) -> bytes:
-    """Try to read the file at `path` in binary format and return its contents. """
-    try:
-        with path.open(mode='rb') as handle:
-            return handle.read()
-    except FileNotFoundError as err:
-        raise ArchiveError(err)
-
-
 def _normalise_path(path: Union[str, Path]) -> str:
     """Modify a path (str or Path) such that it is a Dropbox-compatible path string."""
     # The path of the Dropbox root directory is an empty string.
@@ -270,8 +242,8 @@ def _normalise_path(path: Union[str, Path]) -> str:
 
 def get_auth_code() -> str:
     """In order to connect to dropbox HPCFlow must be authenticated with Dropbox as a valid app.
-    This is done by the user getting an authorisation token from a url and providing it to HPCflow.
-    HPCflow then uses this auth token to get an API token from Dropbox.
+    This is done by the user getting an authorisation token from a url and providing it to hpcflow.
+    hpcflow then uses this auth token to get an API token from Dropbox.
 
     This function prompts the user to go to the auth token url, accepts it as input and gets and
     returns the subsequent API token.
