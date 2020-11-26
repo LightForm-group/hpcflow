@@ -34,78 +34,54 @@ class DropboxCloudProvider(CloudProvider):
         else:
             return False
 
-    def archive_directory(self, local_path, remote_path, exclude):
-        """Archive a the contents of a local directory into a directory on dropbox.
+    def archive_directory(self, local_path: Union[str, Path], remote_path: Union[str, Path],
+                          exclude: List[str]):
+        """
+        Archive a the contents of a local directory into a directory on dropbox.
         Any files in the dropbox directory not in the source directory are ignored.
 
         Parameters
         ----------
-        local_path : str or Path
+        local_path : Path
             Path of directory on local computer to upload to dropbox.
-        remote_path : str or Path
-            Directory on dropbox to upload the files to.
-        exclude : list, optional
-            List of file or directory names to exclude, matched with `fnmatch` for
-            files, or compared directly for directories.
-        """
-
-        print('hpcflow.archive.cloud.providers.dropbox.archive_directory', flush=True)
-
-        local_dir = Path(local_path)
-        dropbox_dir = Path(remote_path)
-        self._upload_dropbox_dir(local_dir, dropbox_dir, exclude=exclude, archive=True)
-
-    def _upload_dropbox_dir(self, local_dir: Path, dropbox_dir: Path, overwrite: bool = False,
-                            auto_rename: bool = False, exclude: List[str] = None,
-                            archive: bool = False):
-        """
-        Parameters
-        ----------
-        local_dir : Path
-            Path of directory on local computer to upload to dropbox.
-        dropbox_dir : Path
+        remote_path : Path
             Directory on dropbox to upload the file to.
-        overwrite : bool
-            If True, the file overwrites an existing file with the same name.
-        auto_rename : bool
-            If True, rename the file if there is a conflict.
         exclude : list, optional
             List of file or directory names to exclude, matched with `fnmatch` for
             files, or compared directly for directories.
-        archive : bool, optional
 
         Notes
         -----
         Does not upload empty directories.
 
         """
-        # Validation
+        print('hpcflow.archive.cloud.providers.dropbox.archive_directory', flush=True)
+
         if exclude is None:
             exclude = []
 
-        if not local_dir.is_dir():
-            raise ValueError(f'Specified `local_dir` is not a directory: {local_dir}')
+        local_path = Path(local_path)
+        remote_path = Path(remote_path)
 
-        for root, dirs, files in os.walk(str(local_dir)):
+        if not local_path.is_dir():
+            raise ValueError(f'Specified `local_dir` is not a directory: {local_path}')
 
+        for root, dirs, files in os.walk(str(local_path)):
             root_test = Path(root)
             dirs[:] = [d for d in dirs if d not in exclude]
-            print('Uploading from root directory: {}'.format(root), flush=True)
+            print(f'Uploading from root directory: {root}', flush=True)
 
             if exclude:
                 files = exclude_specified_files(files, exclude)
 
             for file_name in sorted(files):
                 src_file = root_test.joinpath(file_name)
-                rel_path = src_file.relative_to(local_dir)
-                dst_dir = dropbox_dir.joinpath(rel_path.parent)
+                rel_path = src_file.relative_to(local_path)
+                dst_dir = remote_path.joinpath(rel_path.parent)
 
-                print('Uploading file: {}'.format(file_name), flush=True)
+                print(f'Uploading file: {file_name}', flush=True)
                 try:
-                    if archive:
-                        self._archive_file(src_file, dst_dir)
-                    else:
-                        self._upload_file_to_dropbox(src_file, dst_dir, overwrite, auto_rename)
+                    self._archive_file(src_file, dst_dir)
                 except ArchiveError as err:
                     print(f'Archive error: {err}', flush=True)
                     continue
