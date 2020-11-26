@@ -41,8 +41,7 @@ class MockFolderList:
 
 @pytest.mark.usefixtures("set_config")
 class TestDropboxCloudProvider:
-    """Tests for most of the methods in DropboxCloudProvider. Some longer methods have their own
-    test class."""
+    """Tests for most of the methods in DropboxCloudProvider."""
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
     def test_init_type(self, mock_dropbox, cloud_provider):
         assert isinstance(cloud_provider, DropboxCloudProvider)
@@ -119,10 +118,6 @@ class TestDropboxCloudProvider:
             cloud_provider._upload_file_to_dropbox("", "")
 
 
-class TestArchiveFile:
-    """Tests for the _archive_file method of DropboxCloudProvider."""
-
-
 class TestStaticMethods:
     """Tests for methods in the dropbox_cp file that are not associated with the
     DropboxCloudProvider object"""
@@ -149,7 +144,13 @@ class TestStaticMethods:
     @patch('hpcflow.archive.cloud.dropbox_cp.Path.stat')
     def test_client_modified_time(self, mock_stat_function):
         mock_stat_function.return_value = Mock(st_mtime=1606327099)
-        modified_time = dropbox_cp.get_client_modified_time(Path(__file__))
+        modified_time = dropbox_cp._get_client_modified_time(Path(__file__))
         assert isinstance(modified_time, datetime.datetime)
         assert modified_time == datetime.datetime(year=2020, month=11, day=25, hour=17, minute=58,
                                                   second=19)
+
+    def test_exclude_specified_files(self):
+        exclusion_list = ["*.txt", "b.png"]
+        file_list = ["a.txt", "b.txt", "a.png", "b.png"]
+        expected = ["a.png"]
+        assert dropbox_cp.exclude_specified_files(file_list, exclusion_list) == expected

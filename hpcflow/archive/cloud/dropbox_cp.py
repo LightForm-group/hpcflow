@@ -55,8 +55,9 @@ class DropboxCloudProvider(CloudProvider):
         dropbox_dir = Path(remote_path)
         self._upload_dropbox_dir(local_dir, dropbox_dir, exclude=exclude, archive=True)
 
-    def _upload_dropbox_dir(self, local_dir, dropbox_dir, overwrite=False, auto_rename=False,
-                            exclude=None, archive=False):
+    def _upload_dropbox_dir(self, local_dir: Path, dropbox_dir: Path, overwrite: bool = False,
+                            auto_rename: bool = False, exclude: List[str] = None,
+                            archive: bool = False):
         """
         Parameters
         ----------
@@ -83,7 +84,7 @@ class DropboxCloudProvider(CloudProvider):
             exclude = []
 
         if not local_dir.is_dir():
-            raise ValueError('Specified `local_dir` is not a directory: {}'.format(local_dir))
+            raise ValueError(f'Specified `local_dir` is not a directory: {local_dir}')
 
         for root, dirs, files in os.walk(str(local_dir)):
 
@@ -91,32 +92,27 @@ class DropboxCloudProvider(CloudProvider):
             dirs[:] = [d for d in dirs if d not in exclude]
             print('Uploading from root directory: {}'.format(root), flush=True)
 
+            if exclude:
+                files = exclude_specified_files(files, exclude)
+
             for file_name in sorted(files):
-                up_file = False
-                if exclude is not None:
-                    if not any([fnmatch.fnmatch(file_name, i) for i in exclude]):
-                        up_file = True
-                else:
-                    up_file = True
+                src_file = root_test.joinpath(file_name)
+                rel_path = src_file.relative_to(local_dir)
+                dst_dir = dropbox_dir.joinpath(rel_path.parent)
 
-                if up_file:
-                    src_file = root_test.joinpath(file_name)
-                    rel_path = src_file.relative_to(local_dir)
-                    dst_dir = dropbox_dir.joinpath(rel_path.parent)
+                print('Uploading file: {}'.format(file_name), flush=True)
+                try:
+                    if archive:
+                        self._archive_file(src_file, dst_dir)
+                    else:
+                        self._upload_file_to_dropbox(src_file, dst_dir, overwrite, auto_rename)
+                except ArchiveError as err:
+                    print(f'Archive error: {err}', flush=True)
+                    continue
 
-                    print('Uploading file: {}'.format(file_name), flush=True)
-                    try:
-                        if archive:
-                            self._archive_file(src_file, dst_dir)
-                        else:
-                            self._upload_file_to_dropbox(src_file, dst_dir, overwrite, auto_rename)
-                    except ArchiveError as err:
-                        print(f'Archive error: {err}', flush=True)
-                        continue
-
-                    except CloudProviderError as err:
-                        print(f'Cloud provider error: {err}', flush=True)
-                        continue
+                except CloudProviderError as err:
+                    print(f'Cloud provider error: {err}', flush=True)
+                    continue
 
     def _archive_file(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
                       check_modified_time=True) -> Union[dropbox.files.Metadata, None]:
@@ -148,7 +144,7 @@ class DropboxCloudProvider(CloudProvider):
             return self._upload_file_to_dropbox(local_path, dropbox_path,
                                                 overwrite=True, auto_rename=False)
 
-        client_modified = get_client_modified_time(local_path)
+        client_modified = _get_client_modified_time(local_path)
 
         try:
             # Try to get the last modified time of the file on Dropbox
@@ -250,6 +246,14 @@ class DropboxCloudProvider(CloudProvider):
         return token
 
 
+def exclude_specified_files(files: List[str], exclude: List[str]) -> List[str]:
+    """Remove any file from `files` that matches a pattern in `exclude`."""
+    files_to_exclude = [fnmatch.filter(files, pattern) for pattern in exclude]
+    # Flatten list of lists
+    files_to_exclude = [item for sublist in files_to_exclude for item in sublist]
+    return list(set(files) - set(files_to_exclude))
+
+
 def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
     """Get the tag that determines behaviour when an uploaded file already exists
     in the destination. If `overwrite` is True then overwrite existing files else add the new
@@ -260,7 +264,7 @@ def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
         return dropbox.dropbox.files.WriteMode('add')
 
 
-def get_client_modified_time(local_path: Path):
+def _get_client_modified_time(local_path: Path):
     """Gets the last modified time of a file and converts it to a dropbox compatible time by
     culling the microseconds."""
     # Note: Dropbox culls microseconds from the datetime passed as the
@@ -297,7 +301,7 @@ def _normalise_path(path: Union[str, Path]) -> str:
 def get_auth_code() -> str:
     """In order to connect to dropbox HPCFlow must be authenticated with Dropbox as a valid app.
     This is done by the user getting an authorisation token from a url and providing it to HPCflow.
-    HPCflow then uses this auth token to get an API token from Drobox.
+    HPCflow then uses this auth token to get an API token from Dropbox.
 
     This function prompts the user to go to the auth token url, accepts it as input and gets and
     returns the subsequent API token.
