@@ -41,10 +41,15 @@ class DropboxCloudProvider(CloudProvider):
         try:
             result = self.dropbox_connection.check_user()
         except dropbox.exceptions.AuthError:
+            # This may be triggered a failure to authenticate
+            return False
+        except Exception:
+            # This can be an error from requests due to some sort of connection problem
             return False
         if result.result == "":
             return True
         else:
+            # This is due to some sort of error at Dropbox
             return False
 
     def archive_directory(self, local_path: Union[str, Path], remote_path: Union[str, Path],
@@ -185,6 +190,7 @@ class DropboxCloudProvider(CloudProvider):
             file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path,
                                                                  overwrite_mode, True,
                                                                  client_modified)
+
         except Exception as err:
             raise CloudProviderError(f'Cloud provider error: {err}')
         else:

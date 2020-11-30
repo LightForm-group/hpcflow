@@ -11,24 +11,18 @@ from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider
 import hpcflow.archive.cloud.dropbox_cp as dropbox_cp
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
-from hpcflow.config import Config
 from hpcflow.errors import ConfigurationError
 
 
 @pytest.fixture(scope="session")
-def set_config():
-    Config.set_config()
-
-
-@pytest.fixture(scope="session")
 def cloud_provider() -> DropboxCloudProvider:
-    return DropboxCloudProvider()
+    """Initialise a CloudProvider fixture to use for the tests. It doesn't matter that we
+    initialise the Fixture with a fake token as authentication isn't done until needed
+    and we patch all methods that might trigger authentication."""
+    return DropboxCloudProvider("aaa")
 
 
-class MockResult:
-    result = ""
-
-
+# These mock objects simulate the return type of a Dropbox action on a file or folder.
 mock_file = Mock(spec=dropbox.files.FileMetadata)
 mock_file.name = "Sample File"
 
@@ -36,15 +30,11 @@ mock_folder = Mock(spec=dropbox.files.FolderMetadata)
 mock_folder.name = "Sample Folder"
 
 
-class MockFolderList:
-    entries = [mock_file, mock_folder]
-
-
 class TestGetToken:
     """Test getting the Dropbox API token without setting up the config first."""
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
     def test_token_provided(self, mock_dropbox):
-        _ = DropboxCloudProvider("aaa")
+        DropboxCloudProvider("aaa")
         mock_dropbox.assert_called_with("aaa")
 
     @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
@@ -69,7 +59,6 @@ class TestGetToken:
             DropboxCloudProvider()
 
 
-@pytest.mark.usefixtures("set_config")
 class TestDropboxCloudProvider:
     """Tests for most of the methods in DropboxCloudProvider."""
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
@@ -88,7 +77,7 @@ class TestDropboxCloudProvider:
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_list_folder')
     def test_check_directories(self, mock_files_list_folder, cloud_provider):
-        mock_files_list_folder.return_value = MockFolderList
+        mock_files_list_folder.return_value = Mock(entries=[mock_file, mock_folder])
         file_list = cloud_provider.get_directories(".")
         assert file_list == ["Sample Folder"]
 
