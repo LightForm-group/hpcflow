@@ -9,7 +9,8 @@ import dropbox
 import dropbox.exceptions
 import dropbox.files
 
-from hpcflow.archive.cloud.cloud import CloudProvider, exclude_specified_files, read_file_contents
+from hpcflow.archive.cloud.cloud import CloudProvider
+import hpcflow.archive.cloud.cloud as cloud
 from hpcflow.archive.cloud.errors import CloudCredentialsError, CloudProviderError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.config import Config
@@ -69,7 +70,10 @@ class DropboxCloudProvider(CloudProvider):
             print(f'Uploading from root directory: {root}', flush=True)
 
             if exclude:
-                files = exclude_specified_files(files, exclude)
+                files = cloud.exclude_specified_files(files, exclude)
+                # Modifying dirs in place changes the behavior of os.walk, preventing it
+                # from recursing into removed directories on later iterations.
+                dirs[:] = cloud.exclude_specified_directories(dirs, exclude)
 
             for file_name in sorted(files):
                 src_file = Path(root).joinpath(file_name)
@@ -162,7 +166,7 @@ class DropboxCloudProvider(CloudProvider):
 
         overwrite_mode = _get_overwrite_mode(overwrite)
 
-        file_contents = read_file_contents(local_path)
+        file_contents = cloud.read_file_contents(local_path)
 
         try:
             file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path,

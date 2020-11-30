@@ -41,3 +41,8 @@ def read_file_contents(path: Path) -> bytes:
             return handle.read()
     except FileNotFoundError as err:
         raise ArchiveError(err)
+
+
+def exclude_specified_directories(dirs: List[str], exclude: List[str]):
+    """Remove any string from dirs that occurs in exclude."""
+    return [dir_name for dir_name in dirs if dir_name not in exclude]

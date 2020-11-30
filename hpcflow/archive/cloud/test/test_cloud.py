@@ -25,3 +25,9 @@ class TestCloud:
         file_list = ["a.txt", "b.txt", "a.png", "b.png"]
         expected = ["a.png"]
         assert cloud.exclude_specified_files(file_list, exclusion_list) == expected
+
+    def test_exclude_specified_dirs(self):
+        exclusion_list = ["dir1", "dir*"]
+        dir_list = ["dir1", "dir2", "dir3"]
+        expected = ["dir2", "dir3"]
+        assert cloud.exclude_specified_directories(dir_list, exclusion_list) == expected

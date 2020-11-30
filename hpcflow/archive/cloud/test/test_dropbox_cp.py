@@ -99,7 +99,7 @@ class TestDropboxCloudProvider:
             cloud_provider._get_dropbox_file_modified_time("")
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_upload')
-    @patch('hpcflow.archive.cloud.dropbox_cp.read_file_contents')
+    @patch('hpcflow.archive.cloud.dropbox_cp.cloud.read_file_contents')
     def test_upload_file_to_dropbox(self, mock_read_file, mock_file_upload,
                                     cloud_provider: DropboxCloudProvider):
         """This simulates a successful upload to dropbox."""
@@ -109,7 +109,7 @@ class TestDropboxCloudProvider:
         assert isinstance(file_metadata, dropbox.files.FileMetadata)
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_upload')
-    @patch('hpcflow.archive.cloud.dropbox_cp.read_file_contents')
+    @patch('hpcflow.archive.cloud.dropbox_cp.cloud.read_file_contents')
     def test_failed_upload_file_to_dropbox(self, mock_read_file, mock_file_upload,
                                            cloud_provider: DropboxCloudProvider):
         """This simulates a failed upload to dropbox due to an API error."""
