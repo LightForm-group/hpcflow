@@ -7,12 +7,12 @@ import dropbox
 import dropbox.exceptions
 import dropbox.files
 
-import hpcflow.archive.cloud.cloud
 from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider
 import hpcflow.archive.cloud.dropbox_cp as dropbox_cp
-from hpcflow.archive.cloud.errors import CloudProviderError
+from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.config import Config
+from hpcflow.errors import ConfigurationError
 
 
 @pytest.fixture(scope="session")
@@ -40,17 +40,41 @@ class MockFolderList:
     entries = [mock_file, mock_folder]
 
 
+class TestGetToken:
+    """Test getting the Dropbox API token without setting up the config first."""
+    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
+    def test_token_provided(self, mock_dropbox):
+        _ = DropboxCloudProvider("aaa")
+        mock_dropbox.assert_called_with("aaa")
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
+    def test_env_var_token(self, mock_dropbox, mock_get_env):
+        mock_get_env.return_value = "aaa"
+        DropboxCloudProvider()
+        mock_dropbox.assert_called_with("aaa")
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
+    def test_config_not_initialised(self, mock_get_env):
+        mock_get_env.return_value = None
+        with pytest.raises(ConfigurationError):
+            DropboxCloudProvider()
+
+    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.dropbox_cp.Config.get')
+    def test_config_value_none(self, mock_config_get, mock_get_env):
+        mock_get_env.return_value = None
+        mock_config_get.return_value = None
+        with pytest.raises(CloudCredentialsError):
+            DropboxCloudProvider()
+
+
 @pytest.mark.usefixtures("set_config")
 class TestDropboxCloudProvider:
     """Tests for most of the methods in DropboxCloudProvider."""
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
     def test_init_type(self, mock_dropbox, cloud_provider):
         assert isinstance(cloud_provider, DropboxCloudProvider)
-
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
-    def test_token_provided(self, mock_dropbox):
-        _ = DropboxCloudProvider("aaa")
-        mock_dropbox.assert_called_with("aaa")
 
     @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.check_user')
     def test_check_valid_access(self, mock_check_user, cloud_provider):

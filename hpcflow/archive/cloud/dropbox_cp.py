@@ -23,6 +23,19 @@ class DropboxCloudProvider(CloudProvider):
             token = self._get_token()
         self.dropbox_connection = dropbox.Dropbox(token)
 
+    @staticmethod
+    def _get_token() -> str:
+        """Search environment variables and the config for a Dropbox token."""
+        env_var_name = 'DROPBOX_TOKEN'
+        token = os.getenv(env_var_name)
+        if token is None:
+            token = Config.get('dropbox_token')
+        if token is None:
+            msg = ('Please set the Dropbox access token in an environment variable '
+                   f'"{env_var_name}", or in the config file as "dropbox_token".')
+            raise CloudCredentialsError(msg)
+        return token
+
     def check_access(self) -> bool:
         """Check whether the supplied access token is valid for making a connection to Dropbox."""
         try:
@@ -194,19 +207,6 @@ class DropboxCloudProvider(CloudProvider):
             return isinstance(meta, dropbox.files.FolderMetadata)
         except dropbox.exceptions.ApiError as err:
             raise CloudProviderError(err)
-
-    @staticmethod
-    def _get_token() -> str:
-        """Search environment variables and the config for a Dropbox token."""
-        env_var_name = 'DROPBOX_TOKEN'
-        token = os.getenv(env_var_name)
-        if token is None:
-            token = Config.get('dropbox_token')
-        if token is None:
-            msg = ('Please set the Dropbox access token in an environment variable '
-                   f'"{env_var_name}", or in the config file as "dropbox_token".')
-            raise CloudCredentialsError(msg)
-        return token
 
 
 def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
