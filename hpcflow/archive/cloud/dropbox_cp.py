@@ -15,6 +15,10 @@ from hpcflow.archive.cloud.errors import CloudCredentialsError, CloudProviderErr
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.config import Config
 
+# This is the file size limit in bytes that triggers a session upload instead
+# of a simple upload.
+CHUNK_SIZE = 4 * 1024 * 1024
+
 
 class DropboxCloudProvider(CloudProvider):
     """A DropboxCloudProvider provides methods for archiving directories and files to Dropbox."""
@@ -41,7 +45,7 @@ class DropboxCloudProvider(CloudProvider):
         try:
             result = self.dropbox_connection.check_user()
         except dropbox.exceptions.AuthError:
-            # This may be triggered a failure to authenticate
+            # This may be triggered by a failure to authenticate
             return False
         except Exception:
             # This can be an error from requests due to some sort of connection problem
@@ -51,6 +55,33 @@ class DropboxCloudProvider(CloudProvider):
         else:
             # This is due to some sort of error at Dropbox
             return False
+
+    def get_directories(self, path: Union[str, Path]) -> List[str]:
+        """Get a list of sub directories within a dropbox path."""
+        path = _normalise_path(path)
+        directory_list = []
+        for item in self.dropbox_connection.files_list_folder(path).entries:
+            if isinstance(item, dropbox.files.FolderMetadata):
+                directory_list.append(item.name)
+        return directory_list
+
+    def check_directory_exists(self, directory: Union[str, Path]) -> bool:
+        """Check a given directory exists on dropbox."""
+        directory = _normalise_path(directory)
+        try:
+            meta = self.dropbox_connection.files_get_metadata(directory)
+            return isinstance(meta, dropbox.files.FolderMetadata)
+        except dropbox.exceptions.ApiError as err:
+            raise CloudProviderError(err)
+
+    def _get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
+        """Get the last modified time of a file on Dropbox. Raises `dropbox.exceptions.ApiError`
+        if the file does not exist."""
+        existing_file = self.dropbox_connection.files_get_metadata(dropbox_path)
+        if isinstance(existing_file, dropbox.files.FileMetadata):
+            return existing_file.client_modified
+        else:
+            raise ArchiveError("Provided path is not a file.")
 
     def archive_directory(self, local_path: Union[str, Path], remote_path: Union[str, Path],
                           exclude: List[str] = None):
@@ -84,15 +115,10 @@ class DropboxCloudProvider(CloudProvider):
         if not local_path.is_dir():
             raise ValueError(f'Specified `local_dir` is not a directory: {local_path}')
 
-        for root, dirs, files in os.walk(str(local_path)):
+        paths_to_upload = generate_files(local_path, exclude)
+
+        for root, files in paths_to_upload.items():
             print(f'Uploading from root directory: {root}', flush=True)
-
-            if exclude:
-                files = cloud.exclude_specified_files(files, exclude)
-                # Modifying dirs in place changes the behavior of os.walk, preventing it
-                # from recursing into removed directories on later iterations.
-                dirs[:] = cloud.exclude_specified_directories(dirs, exclude)
-
             for file_name in sorted(files):
                 src_file = Path(root).joinpath(file_name)
                 rel_path = src_file.relative_to(local_path)
@@ -102,11 +128,12 @@ class DropboxCloudProvider(CloudProvider):
                 try:
                     self._archive_file(src_file, dst_dir)
                 except ArchiveError:
-                    # This is raised if a file to be archived is not found
+                    print(f"Could not find local file '{file_name}' at '{root}'. "
+                          f"File not archived.")
                     continue
                 except CloudProviderError:
-                    # This is raised if a file is unable to be uploaded due to some sort
-                    # of problem with Dropbox
+                    print(f"Could not upload file '{file_name}' at '{root}', due to a Dropbox"
+                          f"error. File Not archived.")
                     continue
 
     def _archive_file(self, local_path: Path,
@@ -153,15 +180,6 @@ class DropboxCloudProvider(CloudProvider):
             # If the client file is newer than the one on dropbox then overwrite the one on dropbox
             return self._upload_file_to_dropbox(local_path, dropbox_dir, True, client_modified)
 
-    def _get_dropbox_file_modified_time(self, dropbox_path: str) -> datetime:
-        """Get the last modified time of a file on Dropbox. Raises `dropbox.exceptions.ApiError`
-        if the file does not exist."""
-        existing_file = self.dropbox_connection.files_get_metadata(dropbox_path)
-        if isinstance(existing_file, dropbox.files.FileMetadata):
-            return existing_file.client_modified
-        else:
-            raise ArchiveError("Provided path is not a file.")
-
     def _upload_file_to_dropbox(self, local_path: Union[str, Path], dropbox_dir: Union[str, Path],
                                 overwrite=False,
                                 client_modified=None) -> dropbox.files.FileMetadata:
@@ -184,35 +202,70 @@ class DropboxCloudProvider(CloudProvider):
 
         overwrite_mode = _get_overwrite_mode(overwrite)
 
-        file_contents = cloud.read_file_contents(local_path)
-
         try:
-            file_metadata = self.dropbox_connection.files_upload(file_contents, dropbox_path,
-                                                                 overwrite_mode, True,
-                                                                 client_modified)
-
+            file_metadata = self._select_upload_method(local_path, dropbox_path, overwrite_mode,
+                                                       client_modified)
         except Exception as err:
             raise CloudProviderError(f'Cloud provider error: {err}')
         else:
             return file_metadata
 
-    def get_directories(self, path: Union[str, Path]) -> List[str]:
-        """Get a list of sub directories within a path"""
-        path = _normalise_path(path)
-        directory_list = []
-        for item in self.dropbox_connection.files_list_folder(path).entries:
-            if isinstance(item, dropbox.files.FolderMetadata):
-                directory_list.append(item.name)
-        return directory_list
+    def _select_upload_method(self, local_path: Path, dropbox_path: str,
+                              overwrite_mode: dropbox.dropbox.files.WriteMode,
+                              client_modified: Union[datetime, None]):
+        """This function determines the size of the file to be uploaded and then
+        selects an upload method based on the file size."""
+        file_size = os.path.getsize(local_path)
+        if file_size <= CHUNK_SIZE:
+            return self.simple_upload(local_path, dropbox_path, overwrite_mode, client_modified)
+        else:
+            return self.session_upload(dropbox_path, file_size, local_path, overwrite_mode,
+                                       client_modified)
 
-    def check_directory_exists(self, directory: Union[str, Path]):
-        """Check a given directory exists on the cloud storage."""
-        directory = _normalise_path(directory)
-        try:
-            meta = self.dropbox_connection.files_get_metadata(directory)
-            return isinstance(meta, dropbox.files.FolderMetadata)
-        except dropbox.exceptions.ApiError as err:
-            raise CloudProviderError(err)
+    def session_upload(self, dropbox_path: str, file_size: int,
+                       local_path: Path, overwrite_mode,
+                       client_modified) -> dropbox.files.FileMetadata:
+        """Upload a file to Dropbox using an Upload session. This is required for files > 150 MB.
+        Though is probably beneficial for smaller files as it allows progress to be monitored as
+        the upload progresses."""
+        with open(local_path, 'rb') as f:
+            upload_session = self.dropbox_connection.files_upload_session_start(f.read(CHUNK_SIZE))
+            cursor = dropbox.files.UploadSessionCursor(session_id=upload_session.session_id,
+                                                       offset=f.tell())
+            commit = dropbox.files.CommitInfo(path=dropbox_path, mode=overwrite_mode,
+                                              client_modified=client_modified)
+            while f.tell() < file_size:
+                if (file_size - f.tell()) > CHUNK_SIZE:
+                    self.dropbox_connection.files_upload_session_append_v2(f.read(CHUNK_SIZE),
+                                                                           cursor)
+                    cursor.offset = f.tell()
+                else:
+                    file_metadata = self.dropbox_connection.files_upload_session_finish(
+                        f.read(CHUNK_SIZE), cursor, commit)
+        return file_metadata
+
+    def simple_upload(self, local_path: Path, dropbox_path: str,
+                      overwrite: dropbox.dropbox.files.WriteMode,
+                      client_modified: Union[datetime, None]) -> dropbox.files.FileMetadata:
+        """Upload a file using a simple non-session upload. This is good for smaller files."""
+        file_contents = cloud.read_file_contents(local_path)
+        return self.dropbox_connection.files_upload(file_contents, dropbox_path,
+                                                    overwrite, True,
+                                                    client_modified)
+
+
+def generate_files(local_path: Path, exclude: List[str] = None) -> dict:
+    """Generate a dictionary of files to be uploaded by recursing through a directory using
+    `os.walk`."""
+    file_list = {}
+    for root, dirs, files in os.walk(str(local_path)):
+        if exclude:
+            files = cloud.exclude_specified_files(files, exclude)
+            # Modifying dirs in place changes the behavior of os.walk, preventing it
+            # from recursing into removed directories on later iterations.
+            dirs[:] = cloud.exclude_specified_directories(dirs, exclude)
+        file_list[root] = sorted(files)
+    return file_list
 
 
 def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
@@ -226,12 +279,8 @@ def _get_overwrite_mode(overwrite: bool) -> dropbox.dropbox.files.WriteMode:
 
 
 def _get_client_modified_time(local_path: Path):
-    """Gets the last modified time of a file and converts it to a dropbox compatible time by
+    """Gets the last modified time of a local file and converts it to a dropbox compatible time by
     culling the microseconds."""
-    # Note: Dropbox culls microseconds from the datetime passed as the
-    # `client_modified` parameter (it does not round).
-    # Ref: ("https://www.dropboxforum.com/t5/API-Support-Feedback/Python-API-client"
-    #           "-modified-resolution/m-p/362170/highlight/true#M20596")
     ts_sec = local_path.stat().st_mtime
     dt = datetime.utcfromtimestamp(ts_sec).replace(microsecond=0)
     return dt
