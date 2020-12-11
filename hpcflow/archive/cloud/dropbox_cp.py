@@ -8,6 +8,7 @@ from typing import Union, List
 import dropbox
 import dropbox.exceptions
 import dropbox.files
+import tqdm
 
 from hpcflow.archive.cloud.cloud import CloudProvider
 import hpcflow.archive.cloud.cloud as cloud
@@ -186,7 +187,6 @@ class DropboxCloudProvider(CloudProvider):
         files_to_upload = generate_files(dir_to_upload, remote_dir, exclude)
 
         for file in files_to_upload:
-            print(f"Uploading '{file.path.name}' from root '{file.path.root}'", flush=True)
             try:
                 self._archive_file(file)
             except ArchiveError:
@@ -259,6 +259,8 @@ class DropboxCloudProvider(CloudProvider):
         file
             `FileToUpload` object describing file to be uploaded
         """
+        progress = tqdm.tqdm(total=file.size, desc=f"Uploading file: {file.path.name}",
+                             leave=False)
         with open(file.path, 'rb') as f:
             upload_session = self.dropbox_connection.files_upload_session_start(f.read(CHUNK_SIZE))
             cursor = dropbox.files.UploadSessionCursor(session_id=upload_session.session_id,
@@ -273,6 +275,8 @@ class DropboxCloudProvider(CloudProvider):
                 else:
                     file_metadata = self.dropbox_connection.files_upload_session_finish(
                         f.read(CHUNK_SIZE), cursor, commit)
+                progress.update(CHUNK_SIZE)
+        progress.close()
         return file_metadata
 
     def simple_upload(self, file: FileToUpload) -> dropbox.files.FileMetadata:
