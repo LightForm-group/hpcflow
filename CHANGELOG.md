@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.12] - 2020.12.xx
+
+### Fixed
+
+- Fix kill for partial iterations and stats jobs.
+
 ## [0.1.11] - 2020.08.25
 
 ### Fixed
