@@ -492,8 +492,11 @@ class Workflow(Base):
             for cg_sub in sub.command_group_submissions:
                 for iteration in self.iterations:
                     cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
-                    if cg_sub_iter.scheduler_job_id is not None:
-                        kill_scheduler_ids.append(cg_sub_iter.scheduler_job_id)
+                    if cg_sub_iter:
+                        if cg_sub_iter.scheduler_job_id is not None:
+                            kill_scheduler_ids.append(cg_sub_iter.scheduler_job_id)
+                        if cg_sub_iter.scheduler_stats_job_id is not None:
+                            kill_scheduler_ids.append(cg_sub_iter.scheduler_stats_job_id)
 
         print('Need to kill: {}'.format(kill_scheduler_ids))
         del_cmd = ['qdel'] + [str(i) for i in kill_scheduler_ids]
@@ -1357,6 +1360,7 @@ class Submission(Base):
                 st_cmd.append(str(js_stat_path_i))
 
                 job_id_str = self.submit_jobscript(st_cmd, js_stat_path_i, iteration)
+                cg_sub_iter.scheduler_stats_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
@@ -2323,6 +2327,7 @@ class CommandGroupSubmissionIteration(Base):
     working_dirs_written = Column(Boolean, default=False)
     iteration_id = Column(Integer, ForeignKey('iteration.id'))
     scheduler_job_id = Column(Integer, nullable=True)
+    scheduler_stats_job_id = Column(Integer, nullable=True)
     command_group_submission_id = Column(
         Integer, ForeignKey('command_group_submission.id'))
 
@@ -2346,13 +2351,15 @@ class CommandGroupSubmissionIteration(Base):
             '{}('
             'iteration_id={}, '
             'command_group_submission_id={}, '
-            'scheduler_job_id={}'
+            'scheduler_job_id={}, '
+            'scheduler_stats_job_id={}'
             ')'
         ).format(
             self.__class__.__name__,
             self.iteration_id,
             self.command_group_submission_id,
             self.scheduler_job_id,
+            self.scheduler_stats_job_id,
         )
         return out
 
