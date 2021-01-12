@@ -81,6 +81,7 @@ class Config:
         'cmd_group_keys_allowed': __CMD_GROUP_KEYS_GOOD,
         'cmd_group_defaults': __CMD_GROUP_DEFAULTS,
         'dropbox_app_key': 'g2zt0hmhfjavd2d',
+        'onedrive_client_id': 'cc099865-d26c-4510-829d-9e94b1333800'
     }
 
     # These may be customised in the config file:
