@@ -1,5 +1,12 @@
 # Change Log
 
+
+## [0.1.13] - 2021.01.18
+
+### Fixed
+
+- Fix failure for variables of length 9 due to incorrect zero-padding of variable value directories (#13).
+
 ## [0.1.12] - 2020.12.16
 
 ### Fixed
