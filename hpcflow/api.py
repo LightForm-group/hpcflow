@@ -7,9 +7,13 @@ and includes functions that are called by the command line interface (CLI; in
 """
 
 from pathlib import Path
+from time import sleep
+from datetime import datetime
 import json
 
+
 from beautifultable import BeautifulTable
+from sqlalchemy.exc import OperationalError
 
 from hpcflow.config import Config
 from hpcflow.init_db import init_db
@@ -209,9 +213,24 @@ def set_task_start(cmd_group_sub_id, task_idx, iter_idx, dir_path=None, config_d
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.set_task_start(task_idx, iter_idx)
 
-    session.commit()
+    sleep_time = 5
+    block_msg = (f'{{}} api.set_task_start: Database locked. Sleeping for {sleep_time} '
+                 f'seconds')
+
+    blocked = True
+    while blocked:
+        try:
+            session.refresh(cg_sub)
+            cg_sub.set_task_start(task_idx, iter_idx)
+            session.commit()
+            blocked = False
+        except OperationalError:
+            # Database is likely locked.
+            session.rollback()
+            print(block_msg.format(datetime.now()), flush=True)
+            sleep(sleep_time)
+
     session.close()
 
 
@@ -222,9 +241,24 @@ def set_task_end(cmd_group_sub_id, task_idx, iter_idx, dir_path=None, config_dir
     session = Session()
 
     cg_sub = session.query(CommandGroupSubmission).get(cmd_group_sub_id)
-    cg_sub.set_task_end(task_idx, iter_idx)
 
-    session.commit()
+    sleep_time = 5
+    block_msg = (f'{{}} api.set_task_end: Database locked. Sleeping for {sleep_time} '
+                 f'seconds')
+
+    blocked = True
+    while blocked:
+        try:
+            session.refresh(cg_sub)
+            cg_sub.set_task_end(task_idx, iter_idx)
+            session.commit()
+            blocked = False
+        except OperationalError:
+            # Database is likely locked.
+            session.rollback()
+            print(block_msg.format(datetime.now()), flush=True)
+            sleep(sleep_time)
+
     session.close()
 
 

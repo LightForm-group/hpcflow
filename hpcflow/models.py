@@ -1605,7 +1605,13 @@ class CommandGroupSubmission(Base):
         blocked = True
         while blocked:
 
-            session.refresh(self)
+            try:
+                session.refresh(self)
+            except OperationalError:
+                # Database is likely locked.
+                print(block_msg.format(datetime.now()), flush=True)
+                sleep(sleep_time)
+                continue
 
             if self.is_command_writing:
                 print(block_msg.format(datetime.now()), flush=True)
