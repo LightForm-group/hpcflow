@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.1.14] - 2021.02.04
+
+### Fixed 
+- Fix database lock issue in `api.set_task_start` and `api.set_task_end` when there are a large number of tasks. Fixes #15.
 
 ## [0.1.13] - 2021.01.18
 
