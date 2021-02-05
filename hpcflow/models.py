@@ -1264,7 +1264,7 @@ class Submission(Base):
 
                     # Distribute dirs over num_dir_slots:
                     for k in range(0, max_num_tasks, step_size[cg_sub_idx]):
-                        dir_idx = floor((k / max_num_tasks) * num_dir_vals)
+                        dir_idx = round((k / max_num_tasks) * num_dir_vals)
                         all_dir_slots[k] = 'REPLACE_WITH_DIR_{}'.format(dir_idx)
 
                     wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(

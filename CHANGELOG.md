@@ -1,9 +1,10 @@
 # Change Log
 
-## [0.1.14] - 2021.02.04
+## [0.1.14] - 2021.02.05
 
 ### Fixed 
 - Fix database lock issue in `api.set_task_start` and `api.set_task_end` when there are a large number of tasks. Fixes #15.
+- Fix problem with `Submission.write_submit_dirs` where use of `floor` instead of `round` was causing some working directories to be repeated and some to be missing in the working directory template files.
 
 ## [0.1.13] - 2021.01.18
 
