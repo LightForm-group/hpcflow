@@ -440,7 +440,7 @@ def update_config(name, value, config_dir=None):
 def cloud_connect(provider, config_dir=None):
     Config.set_config(config_dir)
     token_key = {'dropbox': 'dropbox_token'}[provider.lower()]
-    provider = {'dropbox': CloudProviderType.dropbox}[provider.lower()]
+    provider = {'dropbox': dropbox.DropboxCloudProvider}[provider.lower()]
     token = Config.get(token_key)
     good = False
     if token:
