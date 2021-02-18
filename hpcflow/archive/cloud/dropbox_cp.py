@@ -23,20 +23,20 @@ CHUNK_SIZE = 4 * 1024 * 1024
 
 class FileToUpload:
     """An object containing information about a file to be uploaded."""
-    def __init__(self, local_path: Path, remote_directory: Path):
+    def __init__(self, local_path: Path, remote_path: Path):
         """
         Parameters
         ----------
         local_path
             The path of the file to upload
-        remote_directory
-            The directory on Dropbox into which to upload the file
+        remote_path
+            The path on Dropbox to upload the file to
         """
         # The full local path of the file.
         self.path = local_path
 
         # The path on Dropbox the file will have including name
-        self.dropbox_path = _normalise_path(remote_directory / local_path.name)
+        self.dropbox_path = _normalise_path(remote_path)
 
         self.last_modified = self._get_last_modified_time()
         self.size = os.path.getsize(self.path)
