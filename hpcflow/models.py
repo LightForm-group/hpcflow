@@ -492,8 +492,11 @@ class Workflow(Base):
             for cg_sub in sub.command_group_submissions:
                 for iteration in self.iterations:
                     cg_sub_iter = cg_sub.get_command_group_submission_iteration(iteration)
-                    if cg_sub_iter.scheduler_job_id is not None:
-                        kill_scheduler_ids.append(cg_sub_iter.scheduler_job_id)
+                    if cg_sub_iter:
+                        if cg_sub_iter.scheduler_job_id is not None:
+                            kill_scheduler_ids.append(cg_sub_iter.scheduler_job_id)
+                        if cg_sub_iter.scheduler_stats_job_id is not None:
+                            kill_scheduler_ids.append(cg_sub_iter.scheduler_stats_job_id)
 
         print('Need to kill: {}'.format(kill_scheduler_ids))
         del_cmd = ['qdel'] + [str(i) for i in kill_scheduler_ids]
@@ -1261,7 +1264,7 @@ class Submission(Base):
 
                     # Distribute dirs over num_dir_slots:
                     for k in range(0, max_num_tasks, step_size[cg_sub_idx]):
-                        dir_idx = floor((k / max_num_tasks) * num_dir_vals)
+                        dir_idx = round((k / max_num_tasks) * num_dir_vals)
                         all_dir_slots[k] = 'REPLACE_WITH_DIR_{}'.format(dir_idx)
 
                     wk_dirs_path = iter_path.joinpath('working_dirs_{}{}'.format(
@@ -1276,7 +1279,7 @@ class Submission(Base):
                 var_values_path = sg_path.joinpath('var_values')
                 var_values_path.mkdir()
                 for j in range(1, max_num_tasks + 1):
-                    j_fmt = zeropad(j, max_num_tasks + 1)
+                    j_fmt = zeropad(j, max_num_tasks)
                     vv_j_path = var_values_path.joinpath(j_fmt)
                     vv_j_path.mkdir()
 
@@ -1357,6 +1360,7 @@ class Submission(Base):
                 st_cmd.append(str(js_stat_path_i))
 
                 job_id_str = self.submit_jobscript(st_cmd, js_stat_path_i, iteration)
+                cg_sub_iter.scheduler_stats_job_id = int(job_id_str)
                 last_submit_id = job_id_str
 
     def submit_jobscript(self, cmd, js_path, iteration):
@@ -1601,7 +1605,13 @@ class CommandGroupSubmission(Base):
         blocked = True
         while blocked:
 
-            session.refresh(self)
+            try:
+                session.refresh(self)
+            except OperationalError:
+                # Database is likely locked.
+                print(block_msg.format(datetime.now()), flush=True)
+                sleep(sleep_time)
+                continue
 
             if self.is_command_writing:
                 print(block_msg.format(datetime.now()), flush=True)
@@ -2323,6 +2333,7 @@ class CommandGroupSubmissionIteration(Base):
     working_dirs_written = Column(Boolean, default=False)
     iteration_id = Column(Integer, ForeignKey('iteration.id'))
     scheduler_job_id = Column(Integer, nullable=True)
+    scheduler_stats_job_id = Column(Integer, nullable=True)
     command_group_submission_id = Column(
         Integer, ForeignKey('command_group_submission.id'))
 
@@ -2346,13 +2357,15 @@ class CommandGroupSubmissionIteration(Base):
             '{}('
             'iteration_id={}, '
             'command_group_submission_id={}, '
-            'scheduler_job_id={}'
+            'scheduler_job_id={}, '
+            'scheduler_stats_job_id={}'
             ')'
         ).format(
             self.__class__.__name__,
             self.iteration_id,
             self.command_group_submission_id,
             self.scheduler_job_id,
+            self.scheduler_stats_job_id,
         )
         return out
 
