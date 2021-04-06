@@ -57,7 +57,7 @@ setup(
         'click>7.0',
         'ruamel.yaml',
         'sqlalchemy>1.3.2',
-        'dropbox',
+        'dropbox==10.1.2',  # fixed until we make compatible with v11
         'six>1.11.0',  # for dropbox
         'beautifultable'
     ],

@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.1.15] - 2021.xx.xx
+
+### Fixed
+- Lock Dropbox dependency for now at v10.1.2, until we can make changes to upgrade to Dropbox v11.
+
 ## [0.1.14] - 2021.02.05
 
 ### Fixed 
