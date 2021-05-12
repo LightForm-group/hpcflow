@@ -42,7 +42,7 @@ class FileToUpload:
         self.size = os.path.getsize(self.path)
 
         # Default behavior is to not overwrite files in the destination
-        self.overwrite_mode = dropbox.dropbox.files.WriteMode('add')
+        self.overwrite_mode = dropbox.dropbox_client.files.WriteMode('add')
 
     def __eq__(self, other):
         if self.path == other.path:
@@ -227,7 +227,7 @@ class DropboxCloudProvider(CloudProvider):
             return None
         elif file.last_modified > dropbox_modified:
             # If the client file is newer than the one on dropbox then overwrite the one on dropbox
-            file.overwrite_mode = dropbox.dropbox.files.WriteMode('overwrite')
+            file.overwrite_mode = dropbox.dropbox_client.files.WriteMode('overwrite')
 
         return self._choose_session_type(file)
 
