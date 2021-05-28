@@ -15,8 +15,7 @@ import json
 from beautifultable import BeautifulTable
 from sqlalchemy.exc import OperationalError
 
-from hpcflow.archive.archive import CloudProviderType
-import hpcflow.archive.cloud.dropbox_cp as dropbox
+import hpcflow.archive.cloud.providers.dropbox_cp as dropbox
 from hpcflow.config import Config
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, CommandGroupSubmission

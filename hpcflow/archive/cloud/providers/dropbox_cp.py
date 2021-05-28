@@ -8,7 +8,6 @@ from typing import Union, List
 import dropbox
 import dropbox.exceptions
 import dropbox.files
-import tqdm
 
 from hpcflow.archive.cloud.cloud import CloudProvider
 import hpcflow.archive.cloud.cloud as cloud
@@ -219,28 +218,30 @@ class DropboxCloudProvider(CloudProvider):
         """
         # Get the last modified time of the file on Dropbox
         dropbox_modified = self._get_dropbox_file_modified_time(file.dropbox_path)
-        if not dropbox_modified:
-            # File does not exist on dropbox
-            return self._choose_session_type(file)
-        if file.last_modified == dropbox_modified:
-            # If file on Dropbox has the same modified time as the client file then don't upload.
-            return None
-        elif file.last_modified > dropbox_modified:
-            # If the client file is newer than the one on dropbox then overwrite the one on dropbox
-            file.overwrite_mode = dropbox.dropbox_client.files.WriteMode('overwrite')
 
-        return self._choose_session_type(file)
+        if dropbox_modified:
+            if file.last_modified == dropbox_modified:
+                # If file on Dropbox has the same modified time as the client file then don't
+                # upload.
+                return None
+            elif file.last_modified > dropbox_modified:
+                # If the client file is newer than the one on dropbox then overwrite the one on
+                # dropbox
+                file.overwrite_mode = dropbox.dropbox_client.files.WriteMode('overwrite')
+        self._upload_file(file)
 
-    def _choose_session_type(self, file: FileToUpload) -> dropbox.files.FileMetadata:
-        """Choose whether to upload the file as a simple upload or a session upload
-        depending on its size.
+    def _upload_file(self, file: FileToUpload) -> dropbox.files.FileMetadata:
+        """Upload a file to Dropbox. Chooses one of two upload methods based on file size.
 
         Parameters
         ----------
         file
             `FileToUpload` object describing file to be uploaded
-        """
 
+        Returns
+        --------
+        FileMetadata of file if file uploaded. If file not uploaded return None.
+        """
         try:
             if file.size <= CHUNK_SIZE:
                 return self.simple_upload(file)
@@ -259,8 +260,6 @@ class DropboxCloudProvider(CloudProvider):
         file
             `FileToUpload` object describing file to be uploaded
         """
-        progress = tqdm.tqdm(total=file.size, desc=f"Uploading file: {file.path.name}",
-                             leave=False)
         with open(file.path, 'rb') as f:
             upload_session = self.dropbox_connection.files_upload_session_start(f.read(CHUNK_SIZE))
             cursor = dropbox.files.UploadSessionCursor(session_id=upload_session.session_id,
@@ -271,12 +270,9 @@ class DropboxCloudProvider(CloudProvider):
                 if (file.size - f.tell()) > CHUNK_SIZE:
                     self.dropbox_connection.files_upload_session_append_v2(f.read(CHUNK_SIZE),
                                                                            cursor)
-                    cursor.offset = f.tell()
                 else:
                     file_metadata = self.dropbox_connection.files_upload_session_finish(
                         f.read(CHUNK_SIZE), cursor, commit)
-                progress.update(CHUNK_SIZE)
-        progress.close()
         return file_metadata
 
     def simple_upload(self, file: FileToUpload) -> dropbox.files.FileMetadata:

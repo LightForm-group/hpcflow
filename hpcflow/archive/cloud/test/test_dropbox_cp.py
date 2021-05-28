@@ -7,8 +7,8 @@ import dropbox
 import dropbox.exceptions
 import dropbox.files
 
-from hpcflow.archive.cloud.dropbox_cp import DropboxCloudProvider
-import hpcflow.archive.cloud.dropbox_cp as dropbox_cp
+from hpcflow.archive.cloud.providers.dropbox_cp import DropboxCloudProvider
+import hpcflow.archive.cloud.providers.dropbox_cp as dropbox_cp
 from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsError
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.errors import ConfigurationError
@@ -36,8 +36,8 @@ sample_file_3 = Mock(path=Path("C:/upload/nested/c.txt"))
 
 
 class TestFileToUpload:
-    @patch('hpcflow.archive.cloud.dropbox_cp.FileToUpload.__init__')
-    @patch('hpcflow.archive.cloud.dropbox_cp.Path.stat')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.FileToUpload.__init__')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.Path.stat')
     def test_get_last_modified_time(self, mock_stat, mock_init):
         """Simulate getting the modified time of a local file and converting to Dropbox format."""
         mock_init.return_value = None
@@ -53,29 +53,29 @@ class TestFileToUpload:
 
 class TestDropboxCloudProviderInit:
     """Tests for initialisation of DropboxCloudProvider and the ways a token can be given."""
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox')
     def test_provided_token_init(self, mock_dropbox):
         """Init is called with a token."""
         DropboxCloudProvider("aaa")
         mock_dropbox.assert_called_with("aaa")
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox')
     def test_env_var_token_init(self, mock_dropbox, mock_get_env):
         """The token is stored as an environment variable."""
         mock_get_env.return_value = "aaa"
         DropboxCloudProvider()
         mock_dropbox.assert_called_with("aaa")
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.getenv')
     def test_config_not_initialised(self, mock_get_env):
         """There is no environment variable and the config has not been initialised."""
         mock_get_env.return_value = None
         with pytest.raises(ConfigurationError):
             DropboxCloudProvider()
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
-    @patch('hpcflow.archive.cloud.dropbox_cp.Config.get')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.Config.get')
     def test_config_value_none(self, mock_config_get, mock_get_env):
         """There is no environment variable, config is initialised but contains no value
         for dropbox."""
@@ -84,9 +84,9 @@ class TestDropboxCloudProviderInit:
         with pytest.raises(CloudCredentialsError):
             DropboxCloudProvider()
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.getenv')
-    @patch('hpcflow.archive.cloud.dropbox_cp.Config.get')
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.getenv')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.Config.get')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox')
     def test_config_value(self, mock_dropbox, mock_config_get, mock_get_env):
         """There is no environment variable, config is initialised and returns a token."""
         mock_get_env.return_value = None
@@ -103,32 +103,32 @@ class TestDropboxCloudProviderStatus:
         to initialise a DropboxCloudProvider."""
         assert isinstance(cloud_provider, DropboxCloudProvider)
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.check_user')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.check_user')
     def test_check_access_valid(self, mock_check_user, cloud_provider):
         """Simulate the check access function if token is valid."""
         mock_check_user.return_value = Mock(result="")
         assert cloud_provider.check_access() is True
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.check_user')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.check_user')
     def test_check_access_invalid(self, mock_check_user, cloud_provider):
         """Simulate the check access function if token is invalid."""
         mock_check_user.side_effect = dropbox.exceptions.AuthError("", "")
         assert cloud_provider.check_access() is False
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_list_folder')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_list_folder')
     def test_check_directories(self, mock_files_list_folder, cloud_provider):
         """Use the get_directories function to return the contents of a folder."""
         mock_files_list_folder.return_value = Mock(entries=[mock_file, mock_folder])
         file_list = cloud_provider.get_directories(".")
         assert file_list == ["Sample Folder"]
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_get_metadata')
     def test_check_nonexistent_directory(self, mock_files_get_metadata, cloud_provider):
         """Simulate use of the the check_directory_exists function on a non existent folder."""
         mock_files_get_metadata.return_value = mock_file
         assert cloud_provider.check_directory_exists("Sample Folder") is False
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_get_metadata')
     def test_check_directory_error(self, mock_files_get_metadata, cloud_provider):
         """Simulate use of the the check_directory_exists function on something that
         isn't a directory."""
@@ -136,13 +136,13 @@ class TestDropboxCloudProviderStatus:
         with pytest.raises(CloudProviderError):
             cloud_provider.check_directory_exists("Sample Folder")
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_get_metadata')
     def test_check_extant_directory(self, mock_files_get_metadata, cloud_provider):
         """Simulate use of the the check_directory_exists function on a folder that exists."""
         mock_files_get_metadata.return_value = mock_folder
         assert cloud_provider.check_directory_exists("Sample Folder") is True
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_get_metadata')
     def test_get_dropbox_modified_time(self, mock_get_metadata, cloud_provider):
         """Get the modified time of a file on dropbox."""
         mock_get_metadata.return_value = Mock(spec=dropbox.files.FileMetadata,
@@ -151,7 +151,7 @@ class TestDropboxCloudProviderStatus:
         assert isinstance(time, datetime.datetime)
         assert time - datetime.datetime.now() < datetime.timedelta(seconds=10)
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_get_metadata')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_get_metadata')
     def test_failed_get_dropbox_modified_time(self, mock_get_metadata, cloud_provider):
         """Try to get the modified time of something that isn't a file."""
         mock_get_metadata.return_value = Mock(spec=dropbox.files.FolderMetadata)
@@ -161,9 +161,9 @@ class TestDropboxCloudProviderStatus:
 
 class TestDropboxCloudProviderUpload:
     """These tests cover the file upload functions of DropboxCloudProvider."""
-    @patch('hpcflow.archive.cloud.dropbox_cp.Path.is_dir')
-    @patch('hpcflow.archive.cloud.dropbox_cp.generate_files')
-    @patch('hpcflow.archive.cloud.dropbox_cp.DropboxCloudProvider._archive_file')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.Path.is_dir')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.generate_files')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.DropboxCloudProvider._archive_file')
     def test_upload_directory(self, mock_archive_file, mock_generate_files,
                               mock_is_dir, cloud_provider):
         """Upload a the contents of a directory"""
@@ -174,7 +174,7 @@ class TestDropboxCloudProviderUpload:
         mock_archive_file.assert_any_call(sample_file_2)
         mock_archive_file.assert_any_call(sample_file_3)
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.Path.is_dir')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.Path.is_dir')
     def test_upload_file(self, mock_is_dir, cloud_provider):
         """Try to upload a file instead of a directory."""
         mock_is_dir.return_value = False
@@ -183,20 +183,20 @@ class TestDropboxCloudProviderUpload:
 
     # TODO: Tests for _archive_file
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.DropboxCloudProvider.simple_upload')
-    def test_upload_small_file(self, mock_simple_upload, cloud_provider):
-        cloud_provider._choose_session_type(sample_file_1)
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.DropboxCloudProvider.simple_upload')
+    def test_upload_small_file(self, mock_simple_upload, cloud_provider: DropboxCloudProvider):
+        cloud_provider._upload_file(sample_file_1)
         mock_simple_upload.assert_called()
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.DropboxCloudProvider.session_upload')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.DropboxCloudProvider.session_upload')
     def test_upload_big_file(self, mock_session_upload, cloud_provider):
-        cloud_provider._choose_session_type(sample_file_2)
+        cloud_provider._upload_file(sample_file_2)
         mock_session_upload.assert_called()
 
     # TODO: Tests for session_upload
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.dropbox.Dropbox.files_upload')
-    @patch('hpcflow.archive.cloud.dropbox_cp.cloud.read_file_contents')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.dropbox.Dropbox.files_upload')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.cloud.read_file_contents')
     def test_simple_upload(self, mock_read_file, mock_file_upload,
                            cloud_provider: DropboxCloudProvider):
         """This simulates a successful upload to dropbox."""
@@ -209,8 +209,8 @@ class TestDropboxCloudProviderUpload:
 class TestStaticMethods:
     """Tests for methods in the dropbox_cp file that are not associated with the
     DropboxCloudProvider object"""
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.walk')
-    @patch('hpcflow.archive.cloud.dropbox_cp.FileToUpload')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.walk')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.FileToUpload')
     def test_generate_files(self, mock_FileToUpload, mock_os_walk):
         """Generate a dictionary representation of files to be uploaded using `os.walk`."""
         mock_FileToUpload.return_value = create_autospec(dropbox_cp.FileToUpload)
@@ -220,8 +220,8 @@ class TestStaticMethods:
         assert isinstance(file_list, list)
         assert len(file_list) == 3
 
-    @patch('hpcflow.archive.cloud.dropbox_cp.os.walk')
-    @patch('hpcflow.archive.cloud.dropbox_cp.FileToUpload')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.os.walk')
+    @patch('hpcflow.archive.cloud.providers.dropbox_cp.FileToUpload')
     def test_generate_files_exclude_files(self, mock_FileToUpload, mock_os_walk):
         """Generate a dictionary of files to be uploaded, excluding a file using
         pattern matching."""
