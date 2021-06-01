@@ -478,7 +478,7 @@ def cloud_connect(provider, config_dir=None):
     good = False
     if token:
         try:
-            provider.check_access()
+            provider().check_access()
             print('Connected to cloud provider.')
             good = True
         except:

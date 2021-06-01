@@ -8,6 +8,7 @@ from typing import Union, List
 import dropbox
 import dropbox.exceptions
 import dropbox.files
+import sqlalchemy.orm
 
 from hpcflow.archive.cloud.cloud import CloudProvider
 import hpcflow.archive.cloud.cloud as cloud
@@ -68,6 +69,7 @@ class FileToUpload:
 class DropboxCloudProvider(CloudProvider):
     """A DropboxCloudProvider provides methods for archiving directories and their
     contents to Dropbox."""
+    @sqlalchemy.orm.reconstructor
     def __init__(self, token: str = None):
         if token is None:
             token = self._get_token()

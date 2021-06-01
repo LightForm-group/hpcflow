@@ -18,9 +18,9 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 
 from hpcflow.config import Config as CONFIG
 from hpcflow._version import __version__
-from hpcflow.archive.archive import Archive, TaskArchiveStatus, CloudProviderType
+from hpcflow.archive.archive import Archive, TaskArchiveStatus
+from hpcflow.archive.archive import Archive, TaskArchiveStatus
 from hpcflow.base_db import Base
-from hpcflow.archive.cloud.cloud import CloudProvider
 from hpcflow.nesting import NestingType
 from hpcflow.scheduler import SunGridEngine
 from hpcflow.utils import coerce_same_length, zeropad, format_time_delta, get_random_hex, datetime_to_dict, timedelta_to_dict
@@ -293,7 +293,7 @@ class Workflow(Base):
 
         # If using an Archive with a cloud provider, check access:
         for i in archive_objs:
-            if i.cloud_provider != CloudProviderType.null:
+            if i.cloud_provider is not None:
                 msg = f'Checking access to cloud storage ({i.name})...'
                 print(msg, end='', flush=True)
                 i.cloud_provider.check_access()

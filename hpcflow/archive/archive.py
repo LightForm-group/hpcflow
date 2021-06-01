@@ -12,8 +12,7 @@ from pathlib import Path
 from shutil import ignore_patterns
 from time import sleep
 
-from sqlalchemy import (Table, Column, Integer, ForeignKey, String,
-                        UniqueConstraint, Enum, Boolean, PickleType)
+from sqlalchemy import Table, Column, Integer, ForeignKey, String, UniqueConstraint, Enum, Boolean
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 
@@ -24,6 +23,9 @@ from hpcflow.archive.cloud.errors import CloudProviderError, CloudCredentialsErr
 from hpcflow.archive.errors import ArchiveError
 from hpcflow.base_db import Base
 from hpcflow.copytree import copytree_multi
+
+# Dictionary of cloud providers and their corresponding objects.
+CLOUD_PROVIDERS = {'dropbox': DropboxCloudProvider}
 
 
 archive_is_active = Table(
@@ -42,13 +44,6 @@ archive_is_active = Table(
         primary_key=True
     ),
 )
-
-
-class CloudProviderType(enum.Enum):
-
-    dropbox = "dropbox"
-    onedrive = "onedrive"
-    null = ""
 
 
 class RootDirectoryName(enum.Enum):
@@ -70,7 +65,7 @@ class Archive(Base):
 
     __tablename__ = 'archive'
     __table_args__ = (
-        UniqueConstraint('path', 'host', 'cloud_provider',
+        UniqueConstraint('path', 'host',
                          name='archive_location'),
     )
 
@@ -78,8 +73,6 @@ class Archive(Base):
     name = Column(String(255))
     _path = Column('path', String(255))
     host = Column(String(255))
-    cloud_provider_type = Column(Enum(CloudProviderType))
-    cloud_provider = Column(PickleType)
     root_directory_name = Column(Enum(RootDirectoryName))
     root_directory_increment = Column(Boolean)
 
@@ -87,14 +80,14 @@ class Archive(Base):
     directories_archiving = relationship('VarValue', secondary=archive_is_active)
     workflow = relationship('Workflow', back_populates='root_archive', uselist=False)
 
-    def __init__(self, name, path, host='', cloud_provider='', root_directory_name='',
+    def __init__(self, name, path, host='', cloud_provider=None, root_directory_name='',
                  root_directory_increment=True):
 
         self.name = name
         self._path = path
         self.host = host
-        self.cloud_provider_type = CloudProviderType(cloud_provider)
-        self.cloud_provider = new_cloud_provider(self.cloud_provider_type.name)
+        self.cloud_provider_name = cloud_provider
+        self.cloud_provider = self.new_cloud_provider()
         self.root_directory_name = RootDirectoryName(root_directory_name)
         self.root_directory_increment = root_directory_increment
 
@@ -116,7 +109,7 @@ class Archive(Base):
         """
 
         if not self.host:
-            if self.cloud_provider_type != CloudProviderType.null:
+            if self.cloud_provider_name is not None:
                 directories = self.cloud_provider.get_directories(self.path)
             else:
                 directories = [i.name for i in self.path.glob('*') if i.is_dir()]
@@ -129,7 +122,7 @@ class Archive(Base):
         """Check if a given directory exists on the Archive."""
 
         if not self.host:
-            if self.cloud_provider_type != CloudProviderType.null:
+            if self.cloud_provider_name is not None:
                 exists = self.cloud_provider.check_directory_exists(directory)
             else:
                 exists = directory.is_dir()
@@ -186,8 +179,6 @@ class Archive(Base):
 
         Parameters
         ----------
-        directory_value : VarValue
-        exclude : list of str
 
         """
 
@@ -294,7 +285,7 @@ class Archive(Base):
 
         try:
 
-            if self.cloud_provider_type != CloudProviderType.null:
+            if self.cloud_provider_name is not None:
                 try:
                     self.cloud_provider.archive_directory(src_dir, dst_dir, ignore)
                 except (CloudProviderError, CloudCredentialsError, ArchiveError) as err:
@@ -317,9 +308,9 @@ class Archive(Base):
         print('Archive to "{}" took {} seconds'.format(
             self.name, copy_seconds), flush=True)
 
-
-def new_cloud_provider(cloud_type: str, token: str = None) -> CloudProvider:
-    if cloud_type == "dropbox":
-        return DropboxCloudProvider(token)
-    else:
-        raise KeyError(f"Unknown cloud provider {cloud_type}.")
+    def new_cloud_provider(self, token: str = None) -> CloudProvider:
+        try:
+            provider = CLOUD_PROVIDERS[self.cloud_provider_name]
+        except KeyError:
+            raise KeyError(f"Unknown cloud provider {self.cloud_provider_name}.")
+        return provider(token)
