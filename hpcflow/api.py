@@ -16,6 +16,7 @@ from beautifultable import BeautifulTable
 from sqlalchemy.exc import OperationalError
 
 import hpcflow.archive.cloud.providers.dropbox_cp as dropbox
+from hpcflow.archive.archive import CLOUD_PROVIDERS
 from hpcflow.config import Config
 from hpcflow.init_db import init_db
 from hpcflow.models import Workflow, CommandGroupSubmission
@@ -473,7 +474,7 @@ def update_config(name, value, config_dir=None):
 def cloud_connect(provider, config_dir=None):
     Config.set_config(config_dir)
     token_key = {'dropbox': 'dropbox_token'}[provider.lower()]
-    provider = {'dropbox': dropbox.DropboxCloudProvider}[provider.lower()]
+    provider = CLOUD_PROVIDERS[provider.lower()]
     token = Config.get(token_key)
     good = False
     if token:
