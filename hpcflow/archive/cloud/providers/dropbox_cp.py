@@ -8,7 +8,9 @@ from typing import Union, List
 import dropbox
 import dropbox.exceptions
 import dropbox.files
+import requests.exceptions
 import sqlalchemy.orm
+from retrying import retry
 
 from hpcflow.archive.cloud.cloud import CloudProvider
 import hpcflow.archive.cloud.cloud as cloud
@@ -105,6 +107,16 @@ class DropboxCloudProvider(CloudProvider):
             # This is due to some sort of error at Dropbox
             return False
 
+    @staticmethod
+    def retry_if_proxy(exception: Exception):
+        """Return True to retry if exeption is a ProxyError, False otherwise"""
+        if isinstance(exception, requests.exceptions.ProxyError):
+            print("Failed to connect to Dropbox due to proxy error. Retrying...")
+            return True
+        return False
+
+    @retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_exponential_max=10000,
+           retry_on_exception=retry_if_proxy)
     def get_directories(self, path: Union[str, Path]) -> List[str]:
         """Get a list of sub directories within a dropbox path.
 
