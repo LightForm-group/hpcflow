@@ -12,6 +12,7 @@ from pathlib import Path
 from shutil import ignore_patterns
 from time import sleep
 
+import sqlalchemy
 from sqlalchemy import Table, Column, Integer, ForeignKey, String, UniqueConstraint, Enum, Boolean
 from sqlalchemy.orm import relationship, Session
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -73,6 +74,7 @@ class Archive(Base):
     name = Column(String(255))
     _path = Column('path', String(255))
     host = Column(String(255))
+    cloud_provider_name = Column(String(255))
     root_directory_name = Column(Enum(RootDirectoryName))
     root_directory_increment = Column(Boolean)
 
@@ -93,6 +95,13 @@ class Archive(Base):
 
         if not self.check_exists(self.path):
             raise ValueError('Archive path "{}" does not exist.'.format(self.path))
+    
+    @sqlalchemy.orm.reconstructor
+    def reconstruct(self):
+        """This function is run when the Archive object is reconstituted from the database.
+           it is required to set self.cloud_provider as this is a connection to Dropbox that
+           is not stored in the database."""   
+        self.cloud_provider = self.new_cloud_provider()
 
     @property
     def path(self):
@@ -305,8 +314,7 @@ class Archive(Base):
 
         end = datetime.now()
         copy_seconds = (end - start).total_seconds()
-        print('Archive to "{}" took {} seconds'.format(
-            self.name, copy_seconds), flush=True)
+        print('Archive to "{}" took {} seconds'.format(self.name, copy_seconds), flush=True)
 
     def new_cloud_provider(self, token: str = None) -> CloudProvider:
         try:
