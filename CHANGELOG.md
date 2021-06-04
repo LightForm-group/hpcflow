@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.16] - 2021.xx.xx
+
+### Fixed
+
+- Fix warning from sqlalchemy in `hpcflow.models`. Fix [#16](https://github.com/LightForm-group/hpcflow/issues/16).
+
 ## [0.1.15] - 2021.04.10
 
 ### Fixed

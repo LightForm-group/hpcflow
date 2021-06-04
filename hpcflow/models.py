@@ -1418,7 +1418,9 @@ class CommandGroupSubmission(Base):
 
     command_group_exec_order = deferred(
         select([CommandGroup.exec_order]).where(
-            CommandGroup.id_ == command_group_id))
+            CommandGroup.id_ == command_group_id
+        ).scalar_subquery()
+    )
 
     is_command_writing = relationship(
         'IsCommandWriting',
