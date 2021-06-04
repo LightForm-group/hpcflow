@@ -71,12 +71,11 @@ class FileToUpload:
 class DropboxCloudProvider(CloudProvider):
     """A DropboxCloudProvider provides methods for archiving directories and their
     contents to Dropbox."""
-    @sqlalchemy.orm.reconstructor
     def __init__(self, token: str = None):
         if token is None:
             token = self._get_token()
         self.dropbox_connection = dropbox.Dropbox(token)
-
+ 
     @staticmethod
     def _get_token() -> str:
         """Try to find a Dropbox token. First search environment variables and
@@ -107,13 +106,10 @@ class DropboxCloudProvider(CloudProvider):
             # This is due to some sort of error at Dropbox
             return False
 
-    @staticmethod
     def retry_if_proxy(exception: Exception):
-        """Return True to retry if exeption is a ProxyError, False otherwise"""
-        if isinstance(exception, requests.exceptions.ProxyError):
-            print("Failed to connect to Dropbox due to proxy error. Retrying...")
-            return True
-        return False
+        """Return True to retry after printeing message."""
+        print("Failed to connect to Dropbox due to proxy error. Retrying...")
+        return True
 
     @retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_exponential_max=10000,
            retry_on_exception=retry_if_proxy)
@@ -131,7 +127,9 @@ class DropboxCloudProvider(CloudProvider):
             if isinstance(item, dropbox.files.FolderMetadata):
                 directory_list.append(item.name)
         return directory_list
-
+    
+    @retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_exponential_max=10000,
+           retry_on_exception=retry_if_proxy)
     def check_directory_exists(self, directory: Union[str, Path]) -> bool:
         """Check a given directory exists on dropbox.
 
