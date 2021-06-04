@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.1.16] - 2021.xx.xx
+
+### Fixed
+
+- Fix warning from sqlalchemy in `hpcflow.models`. Fix [#16](https://github.com/LightForm-group/hpcflow/issues/16).
+
+## [0.1.15] - 2021.04.10
+
+### Fixed
+- Lock Dropbox dependency for now at v10.1.2, until we can make changes to upgrade to Dropbox v11.
+
 ## [0.1.14] - 2021.02.05
 
 ### Fixed 

@@ -101,3 +101,8 @@ def format_time_delta(time_delta):
 
 def get_random_hex(n=10):
     return ''.join([random.choice('0123456789abcdef') for i in range(n)])
+
+
+def create_file_of_N_MB(number_MB, path):
+    with open(path, 'wb') as fh:
+        fh.write(b'\0' * int(number_MB * 2**20))
