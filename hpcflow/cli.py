@@ -13,6 +13,7 @@ import click
 
 from hpcflow import __version__
 from hpcflow import api
+from hpcflow.utils import create_file_of_N_MB
 
 
 def get_process_stamp():
@@ -457,6 +458,13 @@ def dummy_process_something(infile):
         handle.write('\n{} Modified by `processSomething {}`.\n'.format(
             get_process_stamp(), infile
         ))
+
+
+@dummy.command('makeFile')
+@click.option('--size-MB')
+@click.argument('path')
+def dummy_make_large_file(path, size_mb=100):
+    create_file_of_N_MB(float(size_mb), path)
 
 
 if __name__ == '__main__':
