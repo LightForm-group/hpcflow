@@ -61,15 +61,12 @@ class Archive(Base):
     """Class to represent an archive location."""
 
     __tablename__ = 'archive'
-    __table_args__ = (
-        UniqueConstraint('path', 'host', 'cloud_provider',
-                         name='archive_location'),
-    )
 
     id_ = Column('id', Integer, primary_key=True)
     name = Column(String(255))
     _path = Column('path', String(255))
     host = Column(String(255))
+
     cloud_provider = Column(Enum(CloudProvider))
     root_directory_name = Column(Enum(RootDirectoryName))
     root_directory_increment = Column(Boolean)
