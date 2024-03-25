@@ -1,5 +1,7 @@
 # hpcflow
 
+## **This code has been superseded by a new version that can be found here: https://github.com/hpcflow/hpcflow-new.**
+
 ## Installation
 
 ### Package installation
